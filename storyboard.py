@@ -5,7 +5,7 @@
 拼接用 ConcatenateVideo，存储/复制沿用 features.py 的工具函数。
 只在 server.py 挂两个 hook：handle_get / handle_post
 """
-import os, sys, json, re, time, random, shutil, base64, threading, subprocess, urllib.request, urllib.parse, zlib
+import os, json, re, time, random, shutil, base64, threading, subprocess, urllib.request, urllib.parse, zlib
 
 # numpy 仅 _exposure_lock（逐帧曝光归正）用到，属可选加速依赖：
 # 缺失时该步骤自动跳过、保留原片，剧情工坊其它链路不受影响。
@@ -32,6 +32,52 @@ COMFY_OUT = os.environ.get("JJOS_COMFY_OUT") or _OUTPUT_ROOTS[0]
 
 LOCK = threading.RLock()
 RUN = {"id": None, "stop": False, "msg": "", "ts": 0}
+
+# app/log.py 的延迟句柄：本模块被 app.routes.media 反向 import，顶层直接
+# `from app import log` 会踩循环导入，故首次用时再取，取不到就静默降级。
+_LOGGER = None
+
+
+def _log_ready():
+    global _LOGGER
+    if _LOGGER is None:
+        try:
+            from app import log as _m
+            _LOGGER = _m if _m else False
+        except Exception:  # pragma: no cover - 极端拆分部署
+            _LOGGER = False
+    return _LOGGER or None
+
+
+def _say(msg, *args):
+    """业务日志统一出口：原先散落的 print 全部收编到此（启动横幅仍走 print）。"""
+    lg = _log_ready()
+    if not lg:
+        return
+    try:
+        lg.app(msg, *args)
+    except Exception:
+        pass
+
+
+def _say_err(msg, *args):
+    """错误级业务日志。"""
+    lg = _log_ready()
+    if not lg:
+        return
+    try:
+        lg.error(msg, *args)
+    except Exception:
+        pass
+
+
+def _sanitize(ex):
+    """异常脱敏：抹掉本机绝对路径再回前端（与 app.registry.sanitize_exc 同一套规则）。"""
+    try:
+        from app.registry import sanitize_exc
+        return sanitize_exc(ex)
+    except Exception:
+        return type(ex).__name__
 
 
 def _srv():
@@ -284,7 +330,7 @@ def _en_list(zh_list, tier="fast", kind="shot"):
         if len(arr) != len(zh_list):
             # 条数不等就是错位信号：模型把「仰望花树，轻举酒壶」拆成两条，后面每条都往后错一格，
             # 结果镜2 的动作写成了镜1 的第二句。这种整批结果一律丢弃，改逐条重译
-            print("[story] %s 批量翻译条数不符（%d/%d），改逐条翻译" % (kind, len(arr), len(zh_list)), flush=True)
+            _say("[story] %s 批量翻译条数不符（%d/%d），改逐条翻译" % (kind, len(arr), len(zh_list)))
             singles = []
             for s in zh_list:
                 one = _en_one((s or "")[:160], sys_prompt, tier=tier)
@@ -446,10 +492,10 @@ def llm_plan(mode, source, n, style, tier=None):
             meta["reason"] = (why + "；" if why else "") + (r.get("note") or "显存不足已降级")
         data = _extract_json(r.get("content") or "") if r.get("ok") else None
         if not r.get("ok"):
-            sys.stderr.write("llm_plan error: %s\n" % r.get("error"))
+            _say_err("llm_plan error: %s" % r.get("error"))
     except Exception as e:
         data = None
-        sys.stderr.write("llm_plan error: %s\n" % e)
+        _say_err("llm_plan error: %s" % e)
     if not data or not isinstance(data.get("scenes"), list) or not data["scenes"]:
         data = _fallback_plan(source, n, style_txt)
         meta["reason"] = (meta["reason"] + "；" if meta["reason"] else "") + "模型输出不可解析或无镜头，已用规则兜底"
@@ -476,6 +522,59 @@ def _fallback_plan(source, n, style_txt):
 
 # ---------------------------------------------------------------- 出图 / 出视频
 RATIO_WH = {"16:9": (1280, 704), "9:16": (704, 1280), "1:1": (960, 960), "4:3": (1024, 768), "3:4": (768, 1024)}
+
+# 成片画幅表：比例 → (宽, 高)。与上面的 RATIO_WH 分开是有意为之——
+# RATIO_WH 是「出图分辨率」（贴近出图模型的友好尺寸），这里是「成片画布」
+# （贴近交付平台要求：竖屏 720×1280、横屏 1280×720、方图 1080×1080）。
+# ffmpeg 兜底拼接（_stitch_ffmpeg）与 ffmpeg 兜底插帧（_interp_ffmpeg）都读这份表，
+# 竖屏项目才不会又被拼成 1280×704 横屏加黑边。
+RATIO_FRAME_WH = {
+    "9:16": (720, 1280),
+    "16:9": (1280, 720),
+    "1:1": (1080, 1080),
+    "4:3": (1024, 768),
+    "3:4": (768, 1024),
+    "3:2": (1152, 768),
+    "2:3": (768, 1152),
+    "21:9": (1680, 720),
+}
+FRAME_WH_DEFAULT = (1280, 720)
+_SIZE_RE = re.compile(r"^\s*(\d{2,5})\s*[xX*\u00d7]\s*(\d{2,5})\s*$")
+_RATIO_RE = re.compile(r"^\s*(\d{1,2})\s*[:\uff1a/]\s*(\d{1,2})\s*$")
+
+
+def frame_size(ratio=None, size=None):
+    """取成片画幅 (W,H)。
+
+    - size 显式给了 "720x1280" 这种串就优先用它（前端/脚本可临时指定，不必新增比例）；
+    - 否则按 ratio 查 RATIO_FRAME_WH，脏值(" 9:16 " / "9：16")做一次归一化再查；
+    - 都认不出就回落 FRAME_WH_DEFAULT，绝不抛异常（拼接是兜底链路，不能因参数挂掉）。
+    宽高一律取偶数：yuv420p 要求偶数边长，奇数会让 libx264 直接报错。
+    """
+    if size:
+        m = _SIZE_RE.match(str(size))
+        if m:
+            w, h = int(m.group(1)), int(m.group(2))
+            if 16 <= w <= 4096 and 16 <= h <= 4096:
+                return (w - w % 2, h - h % 2)
+    key = str(ratio or "").strip()
+    if key in RATIO_FRAME_WH:
+        w, h = RATIO_FRAME_WH[key]
+        return (w - w % 2, h - h % 2)
+    m = _RATIO_RE.match(key)
+    if m:
+        norm = "%d:%d" % (int(m.group(1)), int(m.group(2)))
+        if norm in RATIO_FRAME_WH:
+            w, h = RATIO_FRAME_WH[norm]
+            return (w - w % 2, h - h % 2)
+    w, h = FRAME_WH_DEFAULT
+    return (w - w % 2, h - h % 2)
+
+
+# 出图分辨率表补齐：3:2 / 2:3 / 21:9 只在成片表里有，plan() 里 RATIO_WH.get 取不到会
+# 静默回落成 16:9 的 1280×704，于是「宽银幕/竖长图」项目的出图比例和成片比例对不上。
+for _k in ("3:2", "2:3", "21:9"):
+    RATIO_WH.setdefault(_k, RATIO_FRAME_WH[_k])
 
 
 def _roots():
@@ -828,7 +927,7 @@ def _exposure_lock(rel, idx, W, H, lo=0.72, hi=1.30):
                         input=out.tobytes(), capture_output=True)
     if rc.returncode != 0 or not os.path.isfile(dst):
         return None
-    print("[story] 曝光归正 shot%02d 增益 %.2f~%.2f" % (int(idx), gain.min(), gain.max()), flush=True)
+    _say("[story] 曝光归正 shot%02d 增益 %.2f~%.2f" % (int(idx), gain.min(), gain.max()))
     return OUT_SUB + "/" + name
 
 
@@ -881,7 +980,7 @@ def _run_video(sc, opts):
             if _stab_rel:
                 rel = _stab_rel
         except Exception as e:
-            print("[story] 曝光归正跳过：%s" % e, flush=True)
+            _say("[story] 曝光归正跳过：%s" % e)
     sc["video"] = rel
     sc["video_src"] = "/api/afx?i=0&p=" + urllib.parse.quote(rel)
     sc["seed_vid"] = seed
@@ -891,7 +990,7 @@ def _run_video(sc, opts):
 def _set_msg(msg):
     RUN["msg"] = msg
     RUN["ts"] = time.time()
-    print("[story] " + msg, flush=True)
+    _say("[story] " + msg)
 
 
 def _pipeline(pid, opts):
@@ -971,7 +1070,7 @@ def _record_assets(it):
                                 "prompt": it.get("title") or "", "params": {"scenes": len(it["scenes"])},
                                 "seed": 0, "kind": ""})
     except Exception as e:
-        sys.stderr.write("record assets: %s\n" % e)
+        _say_err("record assets: %s" % e)
 
 
 # ---------------------------------------------------------------- 拼接成片
@@ -1141,7 +1240,21 @@ def interp(b):
     pid = S.submit(wf, "story_interp", 0)
     j = _wait(pid, 3600)
     if not j or j.get("state") != "done" or not j.get("files"):
-        return {"error": "插帧失败：%s" % (j or {}).get("state")}
+        # ComfyUI 插帧失败时走 ffmpeg minterpolate 兜底：画幅同样读 frame_size 表，
+        # 避免兜底产物又退回 1280×704 横屏。
+        frel = _interp_ffmpeg(src, factor, fps0, ratio=b.get("ratio") or it.get("ratio"),
+                              size=b.get("size"))
+        if not frel:
+            return {"error": "插帧失败：%s" % ((j or {}).get("state") or "未知原因")}
+        db = _all()
+        it = _find(db, b.get("id"))
+        it["smooth"] = frel
+        it["smooth_src"] = "/api/afx?i=0&p=" + urllib.parse.quote(frel)
+        it["smooth_fps"] = round(fps0 * factor, 2)
+        it["smooth_engine"] = "ffmpeg_minterpolate"
+        _save(db)
+        return {"smooth": frel, "src": it["smooth_src"], "fps": it["smooth_fps"],
+                "factor": factor, "engine": "ffmpeg_minterpolate"}
     f = [x for x in j["files"] if (x.get("type") or "output") == "output"][0]
     vrel = (f.get("subfolder") + "/" if f.get("subfolder") else "") + f["filename"]
     db = _all()
@@ -1186,8 +1299,13 @@ def narrate(b):
     return {"voiced": vrel, "src": it["voiced_src"], "text": text}
 
 
-def _stitch_ffmpeg(segs, fps=24):
-    """ComfyUI 拼接节点失败时的兜底：ffmpeg concat 滤镜，统一分辨率/帧率后硬切。"""
+def _stitch_ffmpeg(segs, fps=24, ratio=None, size=None):
+    """ComfyUI 拼接节点失败时的兜底：ffmpeg concat 滤镜，统一画幅/帧率后硬切。
+
+    画幅由 frame_size(ratio, size) 决定。此前这里写死 scale/pad=1280:704，导致
+    9:16 竖屏项目也被拼成横屏加黑边，短视频场景直接不可用。
+    """
+    w, h = frame_size(ratio, size)
     import subprocess
     try:
         roots = _roots()
@@ -1209,14 +1327,54 @@ def _stitch_ffmpeg(segs, fps=24):
         for rel in segs:
             args += ["-i", os.path.join(roots[0], rel.replace("/", os.sep))]
         k = len(segs)
-        chain = "".join("[%d:v]scale=1280:704:force_original_aspect_ratio=decrease,"
-                        "pad=1280:704:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=%g,format=yuv420p[v%d];" % (i, fps, i)
+        chain = "".join("[%d:v]scale=%d:%d:force_original_aspect_ratio=decrease,"
+                        "pad=%d:%d:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=%g,format=yuv420p[v%d];"
+                        % (i, w, h, w, h, fps, i)
                         for i in range(k))
         concat = "".join("[v%d]" % i for i in range(k)) + "concat=n=%d:v=1:a=0[v]" % k
         args += ["-filter_complex", chain + concat, "-map", "[v]", "-c:v", "libx264",
                  "-crf", "18", "-preset", "medium", "-movflags", "+faststart", dst]
         r = subprocess.run(args, capture_output=True)
         if r.returncode != 0 or not os.path.isfile(dst):
+            return ""
+        return OUT_SUB + "/" + os.path.basename(dst)
+    except Exception:
+        return ""
+
+
+def _interp_ffmpeg(src, factor, fps0, ratio=None, size=None):
+    """ComfyUI 插帧失败时的兜底：ffmpeg minterpolate 补帧，画幅读 frame_size 表。
+
+    src 传绝对路径，成功返回相对 roots 的产物路径，失败返回 ""。
+    音轨先尝试原样 copy（配音不能白做），copy 失败再退回无声重试一次。
+    """
+    import subprocess
+    try:
+        ff = _ffmpeg() if "_ffmpeg" in globals() else None
+        if not ff or not src or not os.path.isfile(src):
+            return ""
+        w, h = frame_size(ratio, size)
+        roots = _roots()
+        out_dir = os.path.join(roots[0], OUT_SUB)
+        os.makedirs(out_dir, exist_ok=True)
+        n = 1
+        while os.path.isfile(os.path.join(out_dir, "smooth_%05d_.mp4" % n)):
+            n += 1
+        dst = os.path.join(out_dir, "smooth_%05d_.mp4" % n)
+        try:
+            out_fps = max(8.0, min(60.0, float(fps0 or 16) * max(2, min(4, int(factor)))))
+        except (TypeError, ValueError):
+            out_fps = 32.0
+        vf = ("minterpolate=fps=%g:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1,"
+              "scale=%d:%d:force_original_aspect_ratio=decrease,"
+              "pad=%d:%d:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p" % (out_fps, w, h, w, h))
+        base = [ff, "-y", "-loglevel", "error", "-i", src, "-map", "0:v:0", "-vf", vf]
+        tail = ["-c:v", "libx264", "-crf", "18", "-preset", "medium",
+                "-movflags", "+faststart", dst]
+        r = subprocess.run(base + ["-map", "0:a?", "-c:a", "copy"] + tail, capture_output=True)
+        if r.returncode != 0 or not os.path.isfile(dst) or os.path.getsize(dst) == 0:
+            r = subprocess.run(base + ["-an"] + tail, capture_output=True)
+        if r.returncode != 0 or not os.path.isfile(dst) or os.path.getsize(dst) == 0:
             return ""
         return OUT_SUB + "/" + os.path.basename(dst)
     except Exception:
@@ -1249,7 +1407,9 @@ def stitch(b):
     if not rel:
         # ComfyUI 的 ConcatenateVideo 会莫名 failed（nodes 返回 messages=None、files=[]），
         # 这时不能把整条流程判死，直接降级到本地 ffmpeg concat。
-        rel = _stitch_ffmpeg(segs, float(b.get("fps") or 24))
+        # 画幅跟着项目比例走：b 里可临时覆盖，否则用项目自身的 ratio
+        rel = _stitch_ffmpeg(segs, float(b.get("fps") or 24),
+                             ratio=b.get("ratio") or it.get("ratio"), size=b.get("size"))
         if not rel:
             return {"error": "拼接失败：ComfyUI 未产出且 ffmpeg 兜底也失败"}
     db = _all()
@@ -1288,6 +1448,214 @@ def export_md(b):
     it2["script_path"] = fn
     _save(db)
     return {"path": fn, "markdown": "\n".join(lines)}
+
+
+# ---------------------------------------------------------------- 字幕 / 整包导出
+# export_md 只导 Markdown 分镜表，接单交付时客户要的是「字幕 + 成片 + 素材」一次给全。
+# 这里补 SRT / ASS 字幕与整包 zip，全部挂在 /api/story/export 上（fmt=srt|ass|zip），
+# 原 /api/story/export（Markdown）行为不变，旧接口一个不动。
+def _export_dir():
+    d = os.path.join(BASE_DIR, "output", "story")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _stem(title):
+    return (re.sub(r"[^\w\u4e00-\u9fa5]+", "_", (title or "project")).strip("_") or "project")[:60]
+
+
+def _srt_ts(sec):
+    """SRT 时间戳：HH:MM:SS,mmm"""
+    ms = int(round(max(0.0, float(sec)) * 1000))
+    h, ms = divmod(ms, 3600000)
+    m, ms = divmod(ms, 60000)
+    s, ms = divmod(ms, 1000)
+    return "%02d:%02d:%02d,%03d" % (h, m, s, ms)
+
+
+def _ass_ts(sec):
+    """ASS 时间戳：H:MM:SS.cc"""
+    cs = int(round(max(0.0, float(sec)) * 100))
+    h, cs = divmod(cs, 360000)
+    m, cs = divmod(cs, 6000)
+    s, cs = divmod(cs, 100)
+    return "%d:%02d:%02d.%02d" % (h, m, s, cs)
+
+
+def _cues(it):
+    """按各镜时长累计出字幕条目：[(起始秒, 结束秒, 台词, 镜号)]，无台词镜头只推进时间。"""
+    t = 0.0
+    out = []
+    for sc in it.get("scenes") or []:
+        try:
+            dur = float(sc.get("seconds") or 4)
+        except (TypeError, ValueError):
+            dur = 4.0
+        if dur <= 0:
+            dur = 4.0
+        text = (sc.get("line") or "").strip()
+        if text:
+            out.append((t, t + dur, text, sc.get("idx")))
+        t += dur
+    return out
+
+
+def srt_text(it):
+    """分镜 → SRT 纯文本（台词字段现成，零额外成本）。"""
+    blocks = []
+    for i, (a, b2, text, _idx) in enumerate(_cues(it), 1):
+        blocks.append("%d\n%s --> %s\n%s\n" % (i, _srt_ts(a), _srt_ts(b2),
+                                                text.replace("\r", " ").replace("\n", " ")))
+    return "\n".join(blocks)
+
+
+def ass_text(it, ratio=None, size=None):
+    """分镜 → ASS 文本：画幅与字号按成片比例换算，底部居中白字黑边。"""
+    w, h = frame_size(ratio if ratio is not None else it.get("ratio"), size)
+    fs = max(16, int(h * 0.045))
+    mv = max(12, int(h * 0.055))
+    head = [
+        "[Script Info]",
+        "; JJOS 剧情工坊自动生成",
+        "ScriptType: v4.00+",
+        "PlayResX: %d" % w,
+        "PlayResY: %d" % h,
+        "WrapStyle: 2",
+        "ScaledBorderAndShadow: yes",
+        "",
+        "[V4+ Styles]",
+        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, "
+        "BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, "
+        "BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
+        "Style: Default,Microsoft YaHei,%d,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,"
+        "0,0,0,0,100,100,0,0,1,2,1,2,40,40,%d,1" % (fs, mv),
+        "",
+        "[Events]",
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
+    ]
+    for a, b2, text, _idx in _cues(it):
+        head.append("Dialogue: 0,%s,%s,Default,,0,0,0,,%s" % (
+            _ass_ts(a), _ass_ts(b2), text.replace("\n", "\\N").replace("{", "\uff5b").replace("}", "\uff5d")))
+    return "\n".join(head) + "\n"
+
+
+def _write_text(path, text):
+    """字幕文件写 UTF-8 BOM：Windows 下播放器/PotPlayer 才认中文，Aegisub 也吃。"""
+    with open(path, "wb") as f:
+        f.write(text.encode("utf-8-sig"))
+    return path
+
+
+def export_srt(b):
+    """导出 SRT 字幕，路径回填到项目（srt_path）。"""
+    db = _all()
+    it = _find(db, b.get("id"))
+    if not it:
+        return {"error": "项目不存在"}
+    text = srt_text(it)
+    if not text.strip():
+        return {"error": "分镜里还没有台词，先补台词再导字幕"}
+    fn = os.path.join(_export_dir(), "%s_字幕_%s.srt" % (_stem(it.get("title")), time.strftime("%Y%m%d_%H%M%S")))
+    _write_text(fn, text)
+    it2 = _find(_all(), b.get("id"))
+    if it2 is not None:
+        it2["srt_path"] = fn
+        _save(db)
+    return {"path": fn, "text": text, "cues": len(_cues(it)), "format": "srt"}
+
+
+def export_ass(b):
+    """导出 ASS 字幕（带样式，画幅跟随项目比例）。"""
+    db = _all()
+    it = _find(db, b.get("id"))
+    if not it:
+        return {"error": "项目不存在"}
+    text = ass_text(it, ratio=b.get("ratio") or it.get("ratio"), size=b.get("size"))
+    if len(_cues(it)) == 0:
+        return {"error": "分镜里还没有台词，先补台词再导字幕"}
+    w, h = frame_size(b.get("ratio") or it.get("ratio"), b.get("size"))
+    fn = os.path.join(_export_dir(), "%s_字幕_%s.ass" % (_stem(it.get("title")), time.strftime("%Y%m%d_%H%M%S")))
+    _write_text(fn, text)
+    it2 = _find(_all(), b.get("id"))
+    if it2 is not None:
+        it2["ass_path"] = fn
+        _save(db)
+    return {"path": fn, "text": text, "cues": len(_cues(it)), "format": "ass",
+            "width": w, "height": h}
+
+
+def _abs_media(rel, root0):
+    """把项目里的相对素材路径还原成磁盘绝对路径；/api/afx 这类 URL 返回空。"""
+    if not rel:
+        return ""
+    p = str(rel)
+    if p.startswith("/api/") or p.startswith("http://") or p.startswith("https://"):
+        return ""
+    if os.path.isabs(p):
+        return p
+    return os.path.join(root0, p.replace("/", os.sep))
+
+
+def export_bundle(b):
+    """整包导出 zip：分镜脚本 + SRT/ASS 字幕 + 各镜素材 + 成片，一次给客户。"""
+    import zipfile
+    db = _all()
+    it = _find(db, b.get("id"))
+    if not it:
+        return {"error": "项目不存在"}
+    md = export_md({"id": b.get("id")})
+    if isinstance(md, dict) and md.get("error"):
+        return md
+    srt = export_srt({"id": b.get("id")})
+    ass = export_ass({"id": b.get("id")})
+    it = _find(_all(), b.get("id"))
+    root0 = _roots()[0]
+    stem = _stem(it.get("title"))
+    dst = os.path.join(_export_dir(), "%s_素材包_%s.zip" % (stem, time.strftime("%Y%m%d_%H%M%S")))
+    added, missing = [], []
+
+    with zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED) as zf:
+        def put(src_abs, arc):
+            if src_abs and os.path.isfile(src_abs):
+                zf.write(src_abs, arc)
+                added.append(arc)
+            else:
+                missing.append(arc)
+
+        if isinstance(md, dict):
+            put(md.get("path"), "%s/分镜脚本.md" % stem)
+        if isinstance(srt, dict) and not srt.get("error"):
+            put(srt.get("path"), "%s/字幕.srt" % stem)
+        if isinstance(ass, dict) and not ass.get("error"):
+            put(ass.get("path"), "%s/字幕.ass" % stem)
+        for i, sc in enumerate(it.get("scenes") or [], 1):
+            try:
+                idx = int(sc.get("idx") or i)
+            except (TypeError, ValueError):
+                idx = i
+            img = _abs_media(sc.get("image"), root0)
+            if img:
+                put(img, "%s/素材/镜头%02d_图%s" % (stem, idx, os.path.splitext(img)[1] or ".png"))
+            vid = _abs_media(sc.get("video"), root0)
+            if vid:
+                put(vid, "%s/素材/镜头%02d_视频%s" % (stem, idx, os.path.splitext(vid)[1] or ".mp4"))
+        for key, name in (("final", "成片"), ("voiced", "成片_配音"), ("smooth", "成片_插帧")):
+            p = _abs_media(it.get(key), root0)
+            if p:
+                put(p, "%s/%s%s" % (stem, name, os.path.splitext(p)[1] or ".mp4"))
+        # 交付说明，客户拿到包不用问「怎么用」
+        zf.writestr("%s/交付说明.txt" % stem, (
+            "JJOS 剧情工坊 · %s\n"
+            "比例：%s   镜头数：%d\n"
+            "含：分镜脚本.md / 字幕.srt / 字幕.ass / 素材（各镜图与视频）/ 成片\n"
+            "字幕.srt 可直接拖入剪映、Premiere；字幕.ass 带样式，Aegisub、VLC 可直接用。\n"
+        ) % (it.get("title") or "未命名", it.get("ratio") or "-", len(it.get("scenes") or [])))
+        added.append("%s/交付说明.txt" % stem)
+
+    size = os.path.getsize(dst)
+    return {"path": dst, "name": os.path.basename(dst), "size": size,
+            "added": len(added), "missing": missing[:20], "missing_count": len(missing),
+            "format": "zip"}
 
 
 # ---------------------------------------------------------------- 接口
@@ -1344,10 +1712,10 @@ def api_plan(b):
         ok = _assemble_v2(scenes, style, characters, tier="fast", source=source,
                           strict_action=bool(b.get("strict_action", True)))
     except Exception as e:
-        print("[story] assemble v2 failed: %s" % str(e)[:160], flush=True)
+        _say_err("[story] assemble v2 failed: %s" % str(e)[:160])
     if ok:
         for idx, iss in PM.audit(scenes):
-            print("[story] 镜%s 提示词体检：%s" % (idx, "；".join(iss)), flush=True)
+            _say("[story] 镜%s 提示词体检：%s" % (idx, "；".join(iss)))
     else:
         _vary_prompts(scenes, stxt)
         if mode != "news":
@@ -1355,7 +1723,7 @@ def api_plan(b):
             try:
                 _rewrite_prompts(scenes, characters, stxt, tier="fast", source=source)
             except Exception as e:
-                print("[story] rewrite prompts failed: %s" % str(e)[:120], flush=True)
+                _say_err("[story] rewrite prompts failed: %s" % str(e)[:120])
     w, h = RATIO_WH.get(ratio, (1280, 704))
     it = {"id": F._uid("s"), "title": (b.get("title") or data.get("title") or "").strip() or
                                       ("短剧_" + time.strftime("%m%d_%H%M") if mode == "drama" else "资讯_" + time.strftime("%m%d_%H%M")),
@@ -1479,7 +1847,6 @@ def handle_post(h, path, qs, body=None):
         if path == "/api/story/remove":
             return h._send(200, api_remove(b)) or True
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return h._send(500, {"error": str(e)}) or True
+        _say_err("旧 storyboard hook 失败：%s" % e)
+        return h._send(500, {"error": _sanitize(e)}) or True
     return False

@@ -11,9 +11,9 @@ import time
 import urllib.request
 
 from .. import VERSION, CODENAME, START_TS
-from ..config import COMFY, OLLAMA, BASE_DIR, OUTPUT_ROOTS, STATIC_DIR, DATA_DIR
+from ..config import COMFY, BASE_DIR, OUTPUT_ROOTS, STATIC_DIR, DATA_DIR
 from ..net import comfy_online, ollama_online, http_json
-from ..registry import get, post
+from ..registry import get, post, sanitize_exc
 
 
 @get("/api/health", name="health", doc="服务健康检查（骨架自带，轻量不探测 GPU）")
@@ -194,9 +194,10 @@ def api_names_add(ctx):
     try:
         r = names.add_user_name(b.get("zh"), b.get("en"))
     except ValueError as e:
-        return ctx.error(str(e), 400)
+        # 校验类文案直接回用户看，但仍做一次路径脱敏再出网
+        return ctx.error(sanitize_exc(e), 400)
     except Exception as e:
-        return ctx.error("写入失败: %s" % e, 500)
+        return ctx.fail(e, 500, "names_add", hint="写入失败")
     return ctx.json({"ok": True, **r})
 
 
@@ -233,7 +234,7 @@ def api_queue_clear(ctx):
         with urllib.request.urlopen(req, timeout=10) as resp:
             resp.read()
     except Exception as e:
-        return ctx.error("清空队列失败: %s" % e, 502)
+        return ctx.error("清空队列失败: " + sanitize_exc(e), 502)
     # 队列已清空，内存里的许可计数也应归位：否则一旦有票据漏归还，
     # 用户在界面上点了「清空队列」依然提交不进去（闸门被幽灵许可占满）。
     try:

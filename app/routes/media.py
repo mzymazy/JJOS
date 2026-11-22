@@ -33,7 +33,7 @@ from ..config import (
     IMG_EXT, VID_EXT, OUTPUT_ROOTS, COMFY_INPUT, GALLERY_EXT,
     CONFIG_PATH, load_config, save_config,
 )
-from ..registry import get, post
+from ..registry import get, post, sanitize_text
 
 
 # ---------------------------------------------------------------- 输出侧
@@ -86,17 +86,17 @@ def api_reffiles(ctx):
     alias = ctx.q1("dir", "input") or "input"
     if alias not in P.REF_DIRS:
         # 别名只认已挂载目录，不再把请求值当路径用
-        return ctx.error("未知目录别名：" + str(alias), 400)
+        return ctx.error("未知目录别名：" + sanitize_text(alias), 400)
     sub = ctx.q1("sub", "") or ""
     kw = (ctx.q1("q", "") or "").strip().lower()
     base = os.path.realpath(P.REF_DIRS[alias])
     if not P.ref_dir_ok(base):
-        return ctx.error("路径不可读：" + str(base))
+        return ctx.error("路径不可读：" + sanitize_text(base))
     target = os.path.abspath(os.path.join(base, sub)) if sub else base
     if not P.is_within(base, target):
         return ctx.error("路径越界", 400)
     if not P.ref_dir_ok(target):
-        return ctx.error("路径不可读：" + target)
+        return ctx.error("路径不可读：" + sanitize_text(target))
 
     out, subs = [], []
     try:
@@ -124,7 +124,7 @@ def api_reffiles(ctx):
                 except OSError:
                     continue
     except Exception as ex:
-        return ctx.error(str(ex), 500)
+        return ctx.fail(ex, 500, "reffiles")
 
     out.sort(key=lambda x: -x["mtime"])
     subs.sort(key=lambda s: s.lower())
@@ -164,7 +164,7 @@ def api_reffile(ctx):
         # 别名 + 相对子路径：只认已挂载目录，越界（.. / junction）一律拒绝
         base = P.REF_DIRS.get(alias)
         if not base:
-            return ctx.error("未知目录别名：" + str(alias), 400)
+            return ctx.error("未知目录别名：" + sanitize_text(alias), 400)
         base = os.path.realpath(base)
         sub = ctx.q1("sub", "") or ""
         full = os.path.abspath(os.path.join(base, sub)) if sub else base
@@ -285,7 +285,7 @@ def api_upload(ctx):
     try:
         up = deps.srv().comfy_upload_image(raw, name)
     except Exception as ex:
-        return ctx.error("上传失败：" + str(ex), 500)
+        return ctx.fail(ex, 500, "upload", hint="上传失败")
     img_ref = (up or {}).get("name") or name
     sub = (up or {}).get("subfolder") or ""
     if sub:
@@ -358,7 +358,7 @@ def api_subjects_fetch(ctx):
     try:
         got = WEB.grab(name, dest, count=want, keyword=(ctx.b("keyword") or "").strip() or None)
     except Exception as ex:
-        return ctx.error("抓图失败：" + str(ex), 502)
+        return ctx.fail(ex, 502, "subjects_fetch", hint="抓图失败")
     if not got: return ctx.error("没抓到符合规格的图，可换关键词或手动上传", 502)
     refs = [g["ref"] for g in got]
     if not ctx.b("save"):
@@ -390,7 +390,7 @@ def api_refconfig(ctx):
     cfg = load_config()
     d = (ctx.b("ref_input") or "").strip()
     if d and not P.ref_dir_ok(d):
-        return ctx.error("目录不存在或不可用：" + d)
+        return ctx.error("目录不存在或不可用：" + sanitize_text(d))
     if d:
         cfg["ref_input"] = os.path.abspath(d)
     extra = ctx.b("ref_extra")
@@ -399,7 +399,7 @@ def api_refconfig(ctx):
     add = (ctx.b("add") or "").strip()
     if add:
         if not P.ref_dir_ok(add):
-            return ctx.error("目录不存在或不可用：" + add)
+            return ctx.error("目录不存在或不可用：" + sanitize_text(add))
         cur = [x for x in (cfg.get("ref_extra") or [])
                if os.path.normcase(os.path.abspath(x)) != os.path.normcase(os.path.abspath(add))]
         cur.append(os.path.abspath(add))
@@ -409,7 +409,7 @@ def api_refconfig(ctx):
         cfg["ref_extra"] = [x for x in (cfg.get("ref_extra") or [])
                             if os.path.normcase(os.path.abspath(x)) != os.path.normcase(os.path.abspath(rm))]
     if not save_config(cfg):
-        return ctx.error("写配置失败：" + CONFIG_PATH, 500)
+        return ctx.error("写配置失败：" + os.path.basename(CONFIG_PATH), 500)
     dirs = P.reload_ref_dirs()
     labels = dict(P.REF_LABELS)
     # 旧代码（features / storyboard / router）读的是主模块的同名全局量，一并同步
@@ -429,7 +429,7 @@ def api_stars_list(ctx):
     try:
         data = STARS.status(store=S)
     except Exception as ex:
-        return ctx.error("影星库读取失败：" + str(ex), 500)
+        return ctx.fail(ex, 500, "stars_list", hint="影星库读取失败")
     return ctx.json(data)
 
 
@@ -458,7 +458,7 @@ def api_stars_sync(ctx):
                          keyword=(ctx.b("keyword") or "").strip() or None,
                          store=S)
     except Exception as ex:
-        return ctx.error("抓取失败：" + str(ex), 502)
+        return ctx.fail(ex, 502, "stars_sync", hint="抓取失败")
     return ctx.json(res)
 
 
@@ -474,7 +474,7 @@ def api_stars_repair(ctx):
     try:
         res = STARS.repair(COMFY_INPUT, names, store=S)
     except Exception as ex:
-        return ctx.error("替换失败：" + str(ex), 502)
+        return ctx.fail(ex, 502, "stars_repair", hint="替换失败")
     return ctx.json(res)
 
 
@@ -483,4 +483,4 @@ def api_stars_prefill(ctx):
     try:
         return ctx.json(STARS.prefill_dict())
     except Exception as ex:
-        return ctx.error("写入词典失败：" + str(ex), 500)
+        return ctx.fail(ex, 500, "stars_prefill", hint="写入词典失败")

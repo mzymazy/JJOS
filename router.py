@@ -156,7 +156,9 @@ def route(req):
     n_design = _hits(lc, kw.get("design"))
     n_anime = _hits(lc, kw.get("anime"))
     n_edit = _hits(lc, kw.get("edit"))
-    n_motion = _hits(lc, kw.get("motion"))
+    # motion 命中数目前只做统计、未进 L1/L2 规则；下划线前缀标明「有意保留待用」，
+    # 免得 ruff F841 把它当死变量，也免得后人误以为漏接规则。
+    _n_motion = _hits(lc, kw.get("motion"))  # noqa: F841
     n_audio = _hits(lc, kw.get("audio"))
     n_hires = _hits(lc, kw.get("hires"))
     free = vram_free_gb()

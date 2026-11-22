@@ -87,6 +87,26 @@ class Request:
     def error(self, msg, code=400, headers=None):
         return self.json({"error": msg}, code, headers)
 
+    def fail(self, ex, code=500, where="", hint=""):
+        """统一失败出口：对外只回脱敏文案，原始堆栈只进日志。
+
+        以前各域各写 `ctx.error(str(e), 500)`，等于把异常原文（常含本机绝对
+        路径、内部端口、插件目录名）直接回给前端；局域网令牌访问形态下就是
+        目录结构泄漏。这里收口到一处：sanitize_exc 抹路径 → error 落盘。
+        hint 保留原来「上传失败：xxx」这类中文前缀，不改变用户可读语义。
+        """
+        try:
+            log_error(where or self.path, ex)
+        except Exception:
+            pass
+        try:
+            msg = sanitize_exc(ex)
+        except Exception:
+            msg = "error"
+        if hint:
+            msg = "%s：%s" % (hint, msg)
+        return self.error(msg, code)
+
     def raw(self, data, ctype="application/octet-stream", code=200):
         self.status = code
         if isinstance(data, str):
@@ -160,6 +180,28 @@ _ABS_WIN_RE = re.compile(r"[A-Za-z]:[\\/][^\s\"'<>|]*")
 _ABS_UNC_RE = re.compile(r"\\\\[^\s\"'<>|]+")
 
 
+def _scrub(text, limit=200):
+    """把绝对路径（盘符 / UNC）换成 <path>，压掉换行与多余空白，超长截断。"""
+    try:
+        msg = "" if text is None else str(text)
+    except Exception:
+        return "error"
+    for rx in (_ABS_WIN_RE, _ABS_UNC_RE):
+        try:
+            msg = rx.sub("<path>", msg)
+        except Exception:
+            pass
+    msg = " ".join(msg.split())
+    if limit and len(msg) > limit:
+        msg = msg[:limit] + "..."
+    return msg
+
+
+def sanitize_text(text, limit=200):
+    """任意回显文本脱敏：给「路径不可读：xxx」「未知别名」这类非异常文案用。"""
+    return _scrub(text, limit)
+
+
 def sanitize_exc(ex, limit=200):
     """异常对外脱敏：只留类型名 + 已抹掉绝对路径的消息，绝不回完整 repr。
 
@@ -171,14 +213,7 @@ def sanitize_exc(ex, limit=200):
         msg = str(ex)
     except Exception:
         return "error"
-    for rx in (_ABS_WIN_RE, _ABS_UNC_RE):
-        try:
-            msg = rx.sub("<path>", msg)
-        except Exception:
-            pass
-    msg = " ".join(msg.split())
-    if len(msg) > limit:
-        msg = msg[:limit] + "..."
+    msg = _scrub(msg, limit)
     return ("%s: %s" % (name, msg)).strip().rstrip(":")
 
 
@@ -192,6 +227,13 @@ def log_error(path, exc):
                 traceback.format_exception(type(exc), exc, exc.__traceback__)))
         with open(os.path.join(LOGS_DIR, "errors.log"), "a", encoding="utf-8") as fh:
             fh.write(block)
+    except Exception:
+        pass
+    # 同时进统一日志 logs/error.log（app/log.py）：排障时只翻一个文件就够
+    try:
+        from . import log as _log
+
+        _log.error("%s | %s", path, sanitize_exc(exc))
     except Exception:
         pass
 
@@ -251,7 +293,7 @@ def dispatch(handler, method, path, qs=None, body=None):
         item["fn"](ctx)
         status = ctx.status if ctx.status is not None else 200
     except Exception as ex:
-        traceback.print_exc()
+        # 堆栈由 log_error 统一落盘（errors.log + logs/error.log），不再 print 到控制台
         log_error(path, ex)
         status = 500
         try:

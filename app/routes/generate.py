@@ -10,19 +10,18 @@
 按既有经验不直接 import server，而用 deps.srv() 延迟取运行中的主模块实例。
 """
 
-import json
 import os
 import random
 import re
-import traceback
 
 import features as F
 import subjects as SUB
 
 from .. import deps
+from .. import log as LOG
 from ..config import MODELS_PROFILE_PATH
 from ..plugins import takeover as TAKEOVER
-from ..registry import get, post
+from ..registry import get, post, sanitize_exc
 
 
 def _m():
@@ -143,8 +142,8 @@ def _desc_en(m, desc):
         try:
             fn = getattr(m, "zh_to_desc", None) or m.zh_to_en
             _DESC_CACHE[desc] = (fn(desc) or "").strip()
-        except Exception:
-            traceback.print_exc()
+        except Exception as ex:
+            LOG.warn("zh_to_desc 失败：%s", ex)
             _DESC_CACHE[desc] = ""
     return _DESC_CACHE[desc]
 
@@ -178,8 +177,8 @@ def _ref_prompt(en, cast):
     try:
         m = _m()
         desc = "; ".join(d for d in [_desc_en(m, c.get("desc")) for c in cast] if d)
-    except Exception:
-        traceback.print_exc()
+    except Exception as ex:
+        LOG.warn("主体描述转英文失败：%s", ex)
         desc = ""
     if desc:
         head += desc + "; "
@@ -358,17 +357,16 @@ def api_kontext_inpaint(ctx):
     # Kontext 只认英文编辑指令，中文原样进 T5 等于没写；翻译失败退回原文而不是直接 500
     try:
         prompt_en = (m.zh_to_edit(clean) or clean).strip()
-    except Exception:
-        traceback.print_exc()
+    except Exception as ex:
+        LOG.warn("编辑指令转英文失败，退回中文原文：%s", ex)
         prompt_en = clean
     body["prompt"] = _ref_prompt(prompt_en, cast) if refs else prompt_en
     try:
         wf, seed = m.wf_kontext_inpaint(body)
     except ValueError as ex:
-        return ctx.error(str(ex), 400)
+        return ctx.error(sanitize_exc(ex), 400)
     except Exception as ex:
-        traceback.print_exc()
-        return ctx.error("构建工作流失败: %r" % (ex,), 500)
+        return ctx.fail(ex, 500, "kinpaint_wf", hint="构建工作流失败")
     out = {"seed": seed, "prompt_en": body["prompt"], "subjects": cast,
            "engine": "kontext_inpaint", "free_bg": bool(body.get("free_bg"))}
     if body.get("dry_run"):          # 只回工作流不占显存，调参阶段靠它快速校验节点图
@@ -378,6 +376,5 @@ def api_kontext_inpaint(ctx):
     try:
         out["job_id"] = m.submit(wf, "kinpaint", seed)
     except Exception as ex:
-        traceback.print_exc()
-        return ctx.error("提交 ComfyUI 失败: %r" % (ex,), 502)
+        return ctx.fail(ex, 502, "kinpaint_submit", hint="提交 ComfyUI 失败")
     return ctx.json(out)

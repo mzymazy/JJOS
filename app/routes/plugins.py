@@ -112,7 +112,7 @@ def api_plugin_run(ctx):
         payload.update(ex.detail or {})
         return ctx.json(payload, ex.code)
     except Exception as ex:
-        return ctx.error("插件执行异常: %r" % ex, 500)
+        return ctx.fail(ex, 500, "plugin_run", hint="插件执行异常")
     return ctx.json(result)
 
 

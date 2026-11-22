@@ -1,10 +1,9 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 JJOS - 本地 AI 创作台（Local Jimeng 技术代号）
 把本机 ComfyUI / Ollama 已部署模型包装成类似即梦的网页界面。
 零第三方依赖，仅用 Python 标准库。
 """
-import base64
 import json
 import mimetypes
 import os
@@ -44,6 +43,25 @@ except Exception as _ex:  # 骨架层异常不得影响服务启动
     _skeleton_dispatch = None
     appcfg = _auth = _jobstore = _gate = _log = _engine = None
     _paths = None
+
+
+def _slog_err(msg, *args):
+    """旧底座里的业务日志统一出口：优先 app/log.py，骨架不可用时退回 stderr。
+
+    根目录的 print 只保留启动横幅；运行期错误一律走这里，交给 app/log.py
+    统一落盘与轮转，不再用 traceback.print_exc 往控制台打整段堆栈。
+    """
+    if _log is not None:
+        try:
+            _log.error(msg, *args)
+            return
+        except Exception:
+            pass
+    try:
+        print((msg % args) if args else msg, flush=True)
+    except Exception:
+        pass
+
 
 # JSON 请求体体积上限。上传接口的 dataURL 也走 JSON，故留足 base64 膨胀空间
 # （32MB 上限 ≈ 24MB 原图 base64），单图本身另有更严的上限在 media.api_upload 里。
@@ -1370,7 +1388,7 @@ def comfy_free(unload_models=True):
                          {"unload_models": bool(unload_models), "free_memory": True},
                          timeout=15)
     except Exception as e:
-        print(f"[free] 释放失败: {e}", flush=True)
+        _slog_err("[free] 释放失败: %s", e)
         return None
 
 
@@ -1577,9 +1595,8 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 if _skeleton_dispatch(self, "GET", path, qs):
                     return
-            except Exception:
-                import traceback
-                traceback.print_exc()
+            except Exception as ex:
+                _slog_err("骨架路由分发失败(GET %s): %s", path, ex)
 
         # 全部 API 路由已迁入 app/routes（system / media / generate / chat / story），
         # 由 app.registry 在上方抢先接管；此处只剩静态资源与兜底 404。
@@ -1607,9 +1624,8 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 if _skeleton_dispatch(self, "POST", path, {}, body):
                     return
-            except Exception:
-                import traceback
-                traceback.print_exc()
+            except Exception as ex:
+                _slog_err("骨架路由分发失败(POST %s): %s", path, ex)
 
         # 全部 API 路由已由 app.registry 接管（system / media / generate / chat / story），
         # features、storyboard、router 三个旧 hook 均已空转或被转发层接走，这里只兜底 404。

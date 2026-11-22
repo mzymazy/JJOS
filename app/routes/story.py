@@ -11,13 +11,12 @@
 export_md / api_remove）。注册表即事实，自省和校验都以它为准。
 """
 
-import traceback
 import urllib.error
 
 import router
 import storyboard
 
-from ..registry import get, post
+from ..registry import get, post, sanitize_text
 
 
 def _call(ctx, fn, *args):
@@ -25,11 +24,12 @@ def _call(ctx, fn, *args):
     try:
         data = fn(*args)
     except urllib.error.HTTPError as e:
-        detail = e.read().decode("utf-8", "replace")[:800]
+        # 上游（ComfyUI 等）响应体里常带本机绝对路径，回前端前统一脱敏 + 截断
+        detail = sanitize_text(e.read().decode("utf-8", "replace"), 300)
         return ctx.error(f"上游返回 {e.code}: {detail}", 400)
     except Exception as e:
-        traceback.print_exc()
-        return ctx.error(str(e), 500)
+        # 统一走 ctx.fail：对外仅回脱敏文案（绝对路径替换为 <path>），堆栈落日志
+        return ctx.fail(e, 500, "story")
     # export_md 返回的是 Markdown 文本，按纯文本下发；其余为 JSON
     if isinstance(data, str):
         return ctx.raw(data, "text/plain; charset=utf-8")
@@ -89,9 +89,34 @@ def api_story_voice(ctx):
     return _call(ctx, storyboard.narrate, _body(ctx))
 
 
-@post("/api/story/export", name="story_export", doc="导出分镜脚本为 Markdown")
+@post("/api/story/export", name="story_export",
+      doc="导出分镜脚本（默认 Markdown；fmt=srt/ass/zip 走字幕与整包导出）")
 def api_story_export(ctx):
-    return _call(ctx, storyboard.export_md, _body(ctx))
+    b = _body(ctx)
+    fmt = str(b.get("fmt") or "").strip().lower()
+    # 旧入口行为不变：不传 fmt 仍是 Markdown；传 fmt 才分流到本轮新增的字幕/整包导出
+    fn = {"srt": storyboard.export_srt,
+          "ass": storyboard.export_ass,
+          "zip": storyboard.export_bundle}.get(fmt) or storyboard.export_md
+    return _call(ctx, fn, b)
+
+
+@post("/api/story/export/srt", name="story_export_srt",
+      doc="导出 SRT 字幕（台词按各镜时长对齐）")
+def api_story_export_srt(ctx):
+    return _call(ctx, storyboard.export_srt, _body(ctx))
+
+
+@post("/api/story/export/ass", name="story_export_ass",
+      doc="导出 ASS 字幕（带样式，画幅跟随项目比例）")
+def api_story_export_ass(ctx):
+    return _call(ctx, storyboard.export_ass, _body(ctx))
+
+
+@post("/api/story/export/bundle", name="story_export_bundle",
+      doc="整包导出 zip：素材 + 成片 + 分镜 + 字幕")
+def api_story_export_bundle(ctx):
+    return _call(ctx, storyboard.export_bundle, _body(ctx))
 
 
 @post("/api/story/remove", name="story_remove", doc="删除分镜项目")
@@ -107,8 +132,7 @@ def api_route_profile(ctx):
         if router.handle_get(ctx.h, ctx.path, ctx.qs):
             return True
     except Exception as e:
-        traceback.print_exc()
-        return ctx.error(f"router error: {e}", 500)
+        return ctx.fail(e, 500, "router", hint="router error")
     return ctx.error("not found", 404)
 
 
@@ -118,6 +142,5 @@ def api_route_post(ctx):
         if router.handle_post(ctx.h, ctx.path, ctx.qs, _body(ctx)):
             return True
     except Exception as e:
-        traceback.print_exc()
-        return ctx.error(f"router error: {e}", 500)
+        return ctx.fail(e, 500, "router", hint="router error")
     return ctx.error("not found", 404)

@@ -169,7 +169,7 @@ def wf_inpaint(p, seed):
 
 def wf_upscale2(p):
     """分级超清：x4 模型处理后按目标倍数缩放"""
-    S = _srv()
+    _srv()   # 只借这次调用确保 server 模块已就位（沿用原有调用顺序，不改行为）
     scale = _f(p, "scale", 2)
     n = {
         "1": {"class_type": "LoadImage", "inputs": {"image": p["image"]}},

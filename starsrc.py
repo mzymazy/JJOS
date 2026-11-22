@@ -214,8 +214,18 @@ def enrich(name):
             "lemma_url": info.get("url") or ""}
 
 
+def _say(msg):
+    """日志统一走 app/log.py；骨架层不可用时退回标准输出（与 stars_sync_all 同策略）。"""
+    try:
+        import app.log as _L
+        _L.app(msg)
+    except Exception:
+        print(msg, flush=True)
+
+
 if __name__ == "__main__":
     import sys
     for n in (sys.argv[1:] or ["汤姆·克鲁斯", "刘亦菲"]):
         i = lemma(n)
-        print(n, "|", i.get("desc"), "| img:", (i.get("image") or "")[:70], "| en:", i.get("en"))
+        _say("%s | %s | img: %s | en: %s" % (n, i.get("desc"),
+                                            (i.get("image") or "")[:70], i.get("en")))

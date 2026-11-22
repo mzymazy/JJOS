@@ -25,7 +25,13 @@ os.makedirs(os.path.dirname(LOG), exist_ok=True)
 
 def log(msg):
     line = "[%s] %s" % (time.strftime("%H:%M:%S"), msg)
-    print(line, flush=True)
+    # 统一进 app/log.py（与主服务同一份日志目录、同一套轮转）；
+    # logs/stars_sync.log 仍保留，因为中断后用 only_missing 续跑要靠它核对进度。
+    try:
+        from app import log as _L
+        _L.app(msg)
+    except Exception:
+        print(line, flush=True)
     with io.open(LOG, "a", encoding="utf-8") as f:
         f.write(line + "\n")
 

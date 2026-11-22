@@ -1,0 +1,62 @@
+name: CI
+
+# 工程配套：双平台跑单测 + 静态检查。
+# 底线原则：**不装任何第三方运行时依赖**（requirements.txt 就是空的），
+# 只用 setup-python 提供的解释器 + CI 里现装的 ruff，保证「裸机可跑」这个承诺不被 CI 破坏。
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: tests / ${{ matrix.os }} / py${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false          # 一个平台挂了，另一个平台的结果也要看到
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        python-version: ["3.9", "3.11"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: 解释器信息（零依赖，故意不 pip install）
+        run: |
+          python -c "import sys, platform; print(sys.version); print(platform.platform())"
+
+      - name: 全仓语法自检（不含导入，只做 ast 解析）
+        run: python tests/check_syntax.py
+
+      - name: 单元测试
+        run: python tests/run_tests.py -v
+
+  lint:
+    name: ruff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装 ruff（仅 CI 工具，不进运行时依赖）
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "ruff==0.6.9"
+
+      - name: ruff 版本
+        run: ruff --version
+
+      - name: ruff check（规则集见 ruff.toml：F + E9，F401 只提示不判失败）
+        run: ruff check . --output-format=github
