@@ -1,4 +1,8 @@
-# JJOS（本地 AI 创作台）
+# JJOS（本地 AI 影视工作站）
+
+> **一键安装 · 一键体检 · 零强制依赖**｜从剧本到成片的本地全链路影视工作站
+>
+> 你付的是电费，不是 token 费 —— `Local-first AI film studio, no API key required.`
 
 把 ComfyUI 里那堆节点工作流收成声明式插件，用浏览器点几下就出图出片。
 
