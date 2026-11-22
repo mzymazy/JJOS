@@ -1,0 +1,44 @@
+{
+  "id": "wan_i2v",
+  "name": "Wan2.2 图生视频",
+  "version": "0.1.0",
+  "api_version": 1,
+  "kind": "video",
+  "author": "JJOS",
+  "license": "MIT",
+  "description": "给一张图让它动起来，高低噪双模型接力采样。与 /api/wan/i2v 等价的工作流镜像。",
+  "tags": [
+    "builtin-mirror",
+    "video"
+  ],
+  "requires": {
+    "engine": "comfyui",
+    "min_app_version": "0.2.0",
+    "custom_nodes": [],
+    "models": [
+      {
+        "file": "clip_vision_h.safetensors",
+        "min_size_mb": 100
+      },
+      {
+        "file": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+        "min_size_mb": 100
+      },
+      {
+        "file": "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+        "min_size_mb": 100
+      },
+      {
+        "file": "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
+        "min_size_mb": 100
+      },
+      {
+        "file": "wan_2.1_vae.safetensors",
+        "min_size_mb": 100
+      }
+    ],
+    "vram_gb": 12,
+    "inputs_dir": []
+  },
+  "builtin": "wf_wan_i2v"
+}

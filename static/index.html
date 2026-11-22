@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JJOS · 本地 AI 创作台</title>
+<script>
+/* 主题先行：在样式前落定 data-theme，避免深色主题首屏白闪 */
+(function () {
+  var OK = ["aurora", "graphite", "clay", "classic"];
+  try {
+    var q = (location.search.match(/[?&]theme=([a-z]+)/) || [])[1];
+    if (q && OK.indexOf(q) >= 0) {
+      document.documentElement.setAttribute("data-theme", q);
+      return;
+    }
+    var v = localStorage.getItem("lj_theme") || "aurora";
+    document.documentElement.setAttribute("data-theme", OK.indexOf(v) >= 0 ? v : "aurora");
+  } catch (e) {
+    document.documentElement.setAttribute("data-theme", "aurora");
+  }
+})();
+</script>
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/themes-index.css">
+<link rel="stylesheet" href="/static/setup.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="logo">J</div>
+    <button class="nav-item active" data-view="create"><span class="ico">✦</span>创作台</button>
+    <button class="nav-item" data-view="gallery"><span class="ico">▦</span>作品库</button>
+    <button class="nav-item" data-view="chat"><span class="ico">✎</span>对话</button>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <h1>JJOS</h1>
+      <span class="sub">本地 AI 创作台 · 全部跑在本机</span>
+      <div class="stats">
+        <span class="pill"><span class="dot" id="dot-comfy"></span>ComfyUI <b id="txt-comfy">检测中</b></span>
+        <span class="pill"><span class="dot" id="dot-ollama"></span>Ollama <b id="txt-ollama">检测中</b></span>
+        <span class="pill" id="pill-gpu">显存 --</span>
+        <span class="pill" id="pill-queue">队列 --</span>
+        <span class="pill setup-entry" id="pill-setup" title="点开：环境自检与缺失清单"><span class="dot"></span>环境 <b>检测中</b></span>
+      </div>
+      <a href="/static/studio.html" style="margin-left:auto;font-size:13px;color:#5b8cff;text-decoration:none;border:1px solid #2a3242;border-radius:8px;padding:6px 12px">创作台 →</a>
+</header>
+
+    <div class="views">
+      <!-- 创作台 -->
+      <section class="view active" id="view-create">
+        <div class="hero">
+          <h2>想做点什么，说出来就行</h2>
+          <p>提示词交给本地 SDXL / Wan2.2，图片和视频都在你自己机器上生成</p>
+        </div>
+
+        <div class="composer">
+          <div class="tabs">
+            <button class="tab active" data-mode="txt2img">文生图</button>
+            <button class="tab" data-mode="i2v">图生视频</button>
+          </div>
+
+          <textarea id="prompt" placeholder="描述你想要的画面：一位穿白色衬衫的年轻女性站在落地窗前，午后阳光，浅景深，电影质感…"></textarea>
+
+          <div class="dropzone" id="dropzone">
+            <div id="thumb-slot"><div class="thumb-empty" id="pick-btn">+</div></div>
+            <div class="hint" id="drop-hint">上传首帧图片用于图生视频<br>支持点击选择或拖拽图片到此处</div>
+            <input type="file" id="file-input" accept="image/*" hidden>
+          </div>
+
+          <div class="rowline">
+            <button class="btn ghost" id="toggle-params">参数 ▾</button>
+            <span class="pill" id="size-pill">1024 × 1024</span>
+            <div class="spacer"></div>
+            <button class="btn" id="btn-gallery-refresh" style="display:none">刷新</button>
+            <button class="btn primary" id="btn-run">生成</button>
+          </div>
+
+          <div class="params" id="params">
+            <div class="field">
+              <label>画面尺寸</label>
+              <div class="chips" id="size-chips">
+                <button class="chip active" data-w="1024" data-h="1024">1:1</button>
+                <button class="chip" data-w="832" data-h="1216">3:4</button>
+                <button class="chip" data-w="1216" data-h="832">4:3</button>
+                <button class="chip" data-w="768" data-h="1344">9:16</button>
+                <button class="chip" data-w="1344" data-h="768">16:9</button>
+              </div>
+            </div>
+            <div class="field">
+              <label>基础模型</label>
+              <select id="ckpt"></select>
+            </div>
+            <div class="field">
+              <label>反向提示词</label>
+              <input id="negative" value="lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, worst quality, low quality, jpeg artifacts, watermark, signature">
+            </div>
+            <div class="field">
+              <label>采样器</label>
+              <select id="sampler"></select>
+            </div>
+            <div class="field">
+              <label>调度器</label>
+              <select id="scheduler"></select>
+            </div>
+            <div class="field"><label>步数</label><input id="steps" type="number" value="28" min="1" max="80"></div>
+            <div class="field"><label>CFG</label><input id="cfg" type="number" value="5.5" step="0.5" min="1" max="20"></div>
+            <div class="field"><label>种子（留空随机）</label><input id="seed" type="number" placeholder="随机"></div>
+            <div class="field i2v-only" style="display:none"><label>视频帧数</label><input id="length" type="number" value="49" min="17" max="121" step="4"></div>
+            <div class="field i2v-only" style="display:none"><label>帧率</label><input id="fps" type="number" value="16" min="8" max="30"></div>
+          </div>
+        </div>
+
+        <div class="section-title">本次生成 <span class="count" id="job-count"></span></div>
+        <div class="jobs" id="jobs"></div>
+      </section>
+
+      <!-- 作品库 -->
+      <section class="view" id="view-gallery">
+        <div class="section-title">ComfyUI 输出目录 <span class="count" id="gallery-count"></span>
+          <div class="spacer"></div>
+          <button class="btn" id="gallery-refresh">刷新</button>
+        </div>
+        <div class="gallery" id="gallery"></div>
+      </section>
+
+      <!-- 对话 -->
+      <section class="view" id="view-chat">
+        <div class="section-title">本地大模型对话
+          <select id="chat-model" style="margin-left:8px;padding:6px 10px;border:1px solid var(--line);border-radius:9px;font-size:12.5px"></select>
+        </div>
+        <div class="chatbox">
+          <div class="chatlog" id="chatlog">
+            <div class="msg"><div class="who">AI</div><div class="bubble">本机 Ollama 模型已就绪，直接问就行。</div></div>
+          </div>
+          <div class="chatinput">
+            <textarea id="chat-text" placeholder="输入内容，Enter 发送，Shift+Enter 换行"></textarea>
+            <button class="btn primary" id="chat-send">发送</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="lightbox" id="lightbox"></div>
+
+<!-- 环境自检向导：首次打开自动弹出，之后点顶栏「环境」随时唤出 -->
+<div class="setup-mask" id="setup-mask">
+  <div class="setup-panel">
+    <div class="setup-head">
+      <h2>环境自检</h2>
+      <span class="setup-verdict" id="setup-verdict"><span class="vdot"></span>未检测</span>
+      <span class="setup-sub" id="setup-sub"></span>
+      <div class="grow"></div>
+      <button class="setup-close" id="setup-close" title="关闭（Esc）">×</button>
+    </div>
+    <div class="setup-tabs">
+      <button class="setup-tab active" id="tab-check">体检结果<span class="badge" id="tab-check-badge">-</span></button>
+      <button class="setup-tab" id="tab-models">模型权重<span class="badge" id="tab-models-badge">-</span></button>
+      <button class="setup-tab" id="tab-features">现在能用什么</button>
+    </div>
+    <div class="setup-body">
+      <section class="active" id="setup-summary"></section>
+      <section id="setup-models"></section>
+      <section id="setup-features"></section>
+    </div>
+    <div class="setup-foot">
+      <label><input type="checkbox" id="setup-noshow"> 启动时不再自动弹出</label>
+      <div class="grow"></div>
+      <button class="btn ghost" id="setup-guide">复制安装指引</button>
+      <button class="btn" id="setup-refresh">重新检测</button>
+      <button class="btn primary" id="setup-done">开始使用</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+<script src="/static/setup.js"></script>
+<script src="/static/theme.js"></script>
+</body>
+</html>

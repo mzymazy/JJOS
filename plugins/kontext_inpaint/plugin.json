@@ -1,0 +1,32 @@
+{
+  "id": "kontext_inpaint",
+  "name": "FLUX Kontext 局部重绘",
+  "version": "0.1.0",
+  "api_version": 1,
+  "kind": "image",
+  "author": "JJOS",
+  "license": "MIT",
+  "description": "按蒙版只重绘指定区域，其余像素保真。与 /api/kontext/inpaint 等价的工作流镜像。",
+  "tags": [
+    "builtin-mirror",
+    "image"
+  ],
+  "requires": {
+    "engine": "comfyui",
+    "min_app_version": "0.2.0",
+    "custom_nodes": [],
+    "models": [
+      {
+        "file": "flux-vae-bf16.safetensors",
+        "min_size_mb": 100
+      },
+      {
+        "file": "flux1-dev-kontext_fp8_scaled.safetensors",
+        "min_size_mb": 100
+      }
+    ],
+    "vram_gb": 7,
+    "inputs_dir": []
+  },
+  "builtin": "wf_kontext_inpaint"
+}

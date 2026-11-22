@@ -1,0 +1,82 @@
+name: Bug 反馈
+description: 出图失败、页面报错、环境起不来——任何"它不该这样"的情况
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        先看一眼浏览器首页弹出的「环境自检」结论（顶栏状态小圆点也能重新打开）。
+        多数"跑不起来"其实是 ComfyUI 没开、权重没放对目录，自检页会直接点出来。
+
+  - type: textarea
+    id: what
+    attributes:
+      label: 发生了什么
+      description: 一句人话讲清现象：哪个页面、点了什么、期望什么、实际什么
+      placeholder: 在创作台点"文生视频"，转了两分钟后提示 onerror，没生成文件。
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开 http://127.0.0.1:8890/static/studio.html
+        2. 模式选「文生视频」，提示词填 xxx，参数保持默认
+        3. 点「开始生成」
+    validations:
+      required: true
+
+  - type: textarea
+    id: env
+    attributes:
+      label: 环境自检结果
+      description: 打开 `http://127.0.0.1:8890/api/setup/check`，把返回的 JSON 贴进来（含本机路径的可以先删掉）
+      render: json
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: 版本号
+      description: 取 `GET /api/version` 的返回
+      placeholder: 0.3.0 / JJOS
+    validations:
+      required: true
+
+  - type: dropdown
+    id: stage
+    attributes:
+      label: 卡在哪一步
+      options:
+        - 环境准备（ComfyUI / Ollama / 权重）
+        - 启动服务
+        - 页面打不开或样式错乱
+        - 提交生成任务报错
+        - 生成很慢或卡住不动
+        - 成片有问题（画面 / 音频 / 时长）
+        - 插件装载失败
+        - 其它
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志片段
+      description: 对应时间段的 `logs/error.log`（如无报错可留空）
+      render: text
+    validations:
+      required: false
+
+  - type: input
+    id: hardware
+    attributes:
+      label: 显卡与显存
+      description: 文生视频类问题必须填，16GB 以下的卡跑 14B 模型容易 OOM
+      placeholder: RTX 5080 16GB
+    validations:
+      required: false

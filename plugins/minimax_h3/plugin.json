@@ -1,0 +1,23 @@
+{
+  "id": "minimax_h3",
+  "name": "MiniMax H3 带声音视频",
+  "version": "0.1.0",
+  "api_version": 1,
+  "kind": "video",
+  "author": "JJOS",
+  "license": "MIT",
+  "description": "图生视频并带音轨。插件版要求直接给最终像素宽高，不做内置实现的尺寸派生。",
+  "tags": [
+    "builtin-mirror",
+    "video"
+  ],
+  "requires": {
+    "engine": "comfyui",
+    "min_app_version": "0.2.0",
+    "custom_nodes": [],
+    "models": [],
+    "vram_gb": 12,
+    "inputs_dir": []
+  },
+  "builtin": "wf_minimax_h3"
+}

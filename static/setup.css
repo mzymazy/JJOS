@@ -1,0 +1,300 @@
+/* JJOS 首次启动向导 / 环境自检面板
+   全部颜色走 style.css + themes.css 暴露的变量，切主题自动跟随，不写死色值。 */
+
+.setup-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: none;
+  place-items: center;
+  background: rgba(18, 18, 26, .46);
+  backdrop-filter: blur(3px);
+  padding: 24px;
+}
+.setup-mask.show { display: grid; }
+
+.setup-panel {
+  width: min(900px, 96vw);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .28);
+  overflow: hidden;
+}
+
+.setup-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.setup-head h2 { font-size: 16px; margin: 0; }
+.setup-head .setup-sub { font-size: 12.5px; color: var(--muted); }
+.setup-head .grow { flex: 1; }
+.setup-close {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  width: 30px; height: 30px;
+  border-radius: 9px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+.setup-close:hover { color: var(--err); border-color: var(--err); }
+
+/* 体检结论徽标 */
+.setup-verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+}
+.setup-verdict.ready { color: var(--ok); border-color: var(--ok); }
+.setup-verdict.partial { color: var(--warn); border-color: var(--warn); }
+.setup-verdict.blocked { color: var(--err); border-color: var(--err); }
+.setup-verdict .vdot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: currentColor;
+}
+
+.setup-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 12px 22px 0;
+}
+.setup-tab {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 7px 14px;
+  border-radius: 10px 10px 0 0;
+  cursor: pointer;
+}
+.setup-tab.active {
+  color: var(--brand);
+  border-color: var(--brand);
+  background: var(--bg);
+  font-weight: 600;
+}
+.setup-tab .badge {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--line);
+  color: var(--muted);
+}
+.setup-tab .badge.err { background: var(--err); color: #fff; }
+.setup-tab .badge.warn { background: var(--warn); color: #fff; }
+
+.setup-body {
+  padding: 16px 22px 4px;
+  overflow: auto;
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.62;
+}
+.setup-body section { display: none; }
+.setup-body section.active { display: block; }
+
+/* 下一步 */
+.setup-steps {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--brand);
+  border-radius: 12px;
+  background: var(--bg);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+.setup-steps h3 {
+  font-size: 12.5px;
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-weight: 600;
+  letter-spacing: .3px;
+}
+.setup-steps ol { margin: 0; padding-left: 18px; }
+.setup-steps li { margin: 4px 0; }
+
+/* 检查项 */
+.setup-check {
+  display: flex;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--line);
+}
+.setup-check:last-child { border-bottom: 0; }
+.setup-check .ic {
+  flex: 0 0 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  margin-top: 2px;
+}
+.setup-check.pass .ic { background: var(--ok); }
+.setup-check.warn .ic { background: var(--warn); }
+.setup-check.fail .ic { background: var(--err); }
+.setup-check .t { font-weight: 600; }
+.setup-check .d { color: var(--muted); font-size: 12.5px; word-break: break-all; }
+.setup-check .h {
+  color: var(--brand);
+  font-size: 12.5px;
+  margin-top: 3px;
+}
+.setup-check .h::before { content: "→ "; }
+
+/* 权重表 */
+.setup-models { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.setup-models th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 600;
+  padding: 8px 8px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.setup-models td {
+  padding: 9px 8px;
+  border-bottom: 1px dashed var(--line);
+  vertical-align: top;
+}
+.setup-models tr.miss td:first-child { color: var(--err); }
+.setup-models tr.ok td:first-child { color: var(--ok); }
+.setup-models code {
+  font-size: 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1px 6px;
+  word-break: break-all;
+  cursor: copy;
+}
+.setup-models .dir { color: var(--muted); font-family: ui-monospace, Menlo, monospace; }
+.setup-tag {
+  display: inline-block;
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.setup-tag.req { color: var(--err); border-color: var(--err); }
+.setup-tag.ok { color: var(--ok); border-color: var(--ok); }
+
+.setup-note {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: var(--muted);
+  font-size: 12.5px;
+  margin: 0 0 14px;
+}
+.setup-note b { color: var(--text); }
+
+/* 功能矩阵 */
+.setup-feats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+.setup-feat {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 11px 13px;
+  background: var(--panel);
+}
+.setup-feat.on { border-left: 3px solid var(--ok); }
+.setup-feat.off { border-left: 3px solid var(--line); opacity: .78; }
+.setup-feat .n { font-weight: 600; font-size: 13px; }
+.setup-feat .k { font-size: 11.5px; color: var(--muted); }
+.setup-feat .m {
+  font-size: 11.5px;
+  color: var(--err);
+  margin-top: 5px;
+  word-break: break-all;
+}
+.setup-feat .okline { font-size: 11.5px; color: var(--ok); margin-top: 5px; }
+
+.setup-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 22px;
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+  flex-wrap: wrap;
+}
+.setup-foot label {
+  font-size: 12.5px;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.setup-foot .grow { flex: 1; }
+
+/* 顶栏环境入口：首页是 .pill，创作台是 header 里的 <a>，共用同一套状态色 */
+.setup-entry {
+  cursor: pointer;
+  user-select: none;
+}
+.setup-entry .dot {
+  display: inline-block;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.setup-entry b { font-weight: 600; }
+.setup-entry b.ready, .setup-entry .dot.ready { color: var(--ok); }
+.setup-entry b.partial, .setup-entry .dot.partial { color: var(--warn); }
+.setup-entry b.blocked, .setup-entry .dot.blocked { color: var(--err); }
+.setup-entry .dot.ready { background: var(--ok); }
+.setup-entry .dot.partial { background: var(--warn); }
+.setup-entry .dot.blocked { background: var(--err); }
+
+@media (max-width: 720px) {
+  .setup-mask { padding: 0; }
+  .setup-panel { width: 100vw; max-height: 100vh; height: 100vh; border-radius: 0; }
+  .setup-models .hide-sm { display: none; }
+  .setup-foot { padding: 11px 14px; }
+}
+
+/* 长路径与长文件名：单行截断不影响阅读，避免撑破卡片 */
+.setup-panel code,
+.setup-panel .path,
+.setup-panel .detail,
+.setup-panel .hint {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.setup-panel .path {
+  display: block;
+  line-height: 1.5;
+}
+/* 模型缺失时的行内动作按钮，别挤成一行字 */
+.setup-panel button.mini {
+  margin-left: 6px;
+  padding: 1px 8px;
+  font-size: 12px;
+}

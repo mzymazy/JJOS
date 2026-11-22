@@ -1,0 +1,45 @@
+{
+  "id": "kontext_multi",
+  "name": "FLUX Kontext 多参考图",
+  "version": "0.1.0",
+  "api_version": 1,
+  "kind": "image",
+  "author": "JJOS",
+  "license": "MIT",
+  "description": "底图 + 最多 4 张参考图的指令式改图，节点随参考图数量变（变体工作流）",
+  "tags": [
+    "builtin-mirror",
+    "image",
+    "multi-ref",
+    "variants"
+  ],
+  "builtin": "wf_flux_kontext_multi",
+  "variants": {
+    "by": "refs",
+    "dedupe_with": "image",
+    "files": {
+      "0": "workflows/refs0.json",
+      "1": "workflows/refs1.json",
+      "2": "workflows/refs2.json",
+      "3": "workflows/refs3.json",
+      "4": "workflows/refs4.json"
+    }
+  },
+  "requires": {
+    "engine": "comfyui",
+    "min_app_version": "0.2.0",
+    "custom_nodes": [],
+    "models": [
+      {
+        "name": "flux1-dev-kontext_fp8_scaled.safetensors",
+        "min_size_mb": 100
+      },
+      {
+        "name": "flux-vae-bf16.safetensors",
+        "min_size_mb": 100
+      }
+    ],
+    "vram_gb": 7,
+    "inputs_dir": []
+  }
+}

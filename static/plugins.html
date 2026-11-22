@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JJOS · 插件台</title>
+<style>
+  :root{
+    --bg:#0b0d12; --panel:#12151d; --panel2:#171b25; --line:#232936;
+    --fg:#e6e9f0; --dim:#8b93a7; --accent:#5b8cff; --ok:#3ecf8e; --warn:#f0b429; --err:#f0616d;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font:14px/1.55 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+  header{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--line);
+         background:var(--panel);position:sticky;top:0;z-index:5}
+  header h1{font-size:15px;margin:0;font-weight:600;letter-spacing:.3px}
+  header .sub{color:var(--dim);font-size:12px}
+  header .grow{flex:1}
+  button{background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:8px;
+         padding:7px 13px;cursor:pointer;font-size:13px;transition:.15s}
+  button:hover{border-color:#38415a;background:#1d2230}
+  button.primary{background:#2b4bdc;border-color:#2b4bdc;color:#fff}
+  button.primary:hover{background:#3557f0}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .layout{display:grid;grid-template-columns:290px 1fr;height:calc(100vh - 53px)}
+  aside{border-right:1px solid var(--line);overflow:auto;padding:12px;background:var(--panel)}
+  .pcard{border:1px solid var(--line);border-radius:10px;padding:10px 11px;margin-bottom:9px;cursor:pointer;
+         background:var(--panel2);transition:.15s}
+  .pcard:hover{border-color:#38415a}
+  .pcard.active{border-color:var(--accent);box-shadow:0 0 0 1px rgba(91,140,255,.35) inset}
+  .pcard .t{display:flex;align-items:center;gap:7px;font-weight:600;font-size:13px}
+  .pcard .d{color:var(--dim);font-size:11.5px;margin-top:4px;line-height:1.45}
+  .pill{font-size:10.5px;padding:1px 7px;border-radius:99px;border:1px solid transparent;white-space:nowrap}
+  .pill.ok{background:rgba(62,207,142,.13);color:var(--ok);border-color:rgba(62,207,142,.3)}
+  .pill.degraded{background:rgba(240,180,41,.13);color:var(--warn);border-color:rgba(240,180,41,.3)}
+  .pill.disabled{background:rgba(240,97,109,.13);color:var(--err);border-color:rgba(240,97,109,.3)}
+  main{overflow:auto;padding:20px 24px 60px}
+  .empty{color:var(--dim);padding:40px 0;text-align:center}
+  h2{font-size:16px;margin:0 0 4px}
+  .meta{color:var(--dim);font-size:12px;margin-bottom:16px;display:flex;gap:14px;flex-wrap:wrap}
+  .group{margin:0 0 18px}
+  .group-title{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.7px;
+               margin:0 0 9px;display:flex;align-items:center;gap:8px;cursor:default}
+  .group-title.collapsible{cursor:pointer}
+  .group-title .cnt{color:#5a637a}
+  .field{margin-bottom:11px;max-width:640px}
+  .field label{display:block;font-size:12.5px;color:#c3c9d8;margin-bottom:5px}
+  .field .hint{color:var(--dim);font-size:11px;margin-left:6px;font-weight:400}
+  .field input[type=text],.field input[type=number],.field textarea,.field select{
+    width:100%;background:#0e1118;color:var(--fg);border:1px solid var(--line);border-radius:8px;
+    padding:8px 10px;font:13px/1.5 inherit;outline:none}
+  .field textarea{min-height:74px;resize:vertical}
+  .field input:focus,.field textarea:focus,.field select:focus{border-color:var(--accent)}
+  .row{display:flex;gap:10px;align-items:center}
+  .row input[type=range]{flex:1;accent-color:var(--accent)}
+  .row .val{min-width:54px;text-align:right;color:#c3c9d8;font-variant-numeric:tabular-nums}
+  .switch{display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+  .actions{display:flex;gap:10px;margin:18px 0 8px;flex-wrap:wrap;align-items:center}
+  .status{font-size:12.5px;color:var(--dim)}
+  .status.ok{color:var(--ok)} .status.err{color:var(--err)}
+  pre{background:#0e1118;border:1px solid var(--line);border-radius:10px;padding:12px;
+      overflow:auto;font:12px/1.5 Consolas,Menlo,monospace;max-height:420px;color:#b9c2d6}
+  .thumbs{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+  .thumbs img{max-width:220px;border-radius:8px;border:1px solid var(--line)}
+  details.sec{margin-top:16px}
+  details.sec summary{cursor:pointer;color:var(--dim);font-size:12.5px;margin-bottom:8px}
+  .badge{font-size:11px;color:var(--dim);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
+.badge.on{color:var(--ok);border-color:var(--ok)}
+</style>
+</head>
+<body>
+<header>
+  <h1>JJOS 插件台</h1>
+  <span class="sub" id="verLine">正在读取插件清单…</span>
+  <span class="grow"></span>
+  <button id="btnReload" title="重新扫描 plugins/ 目录，改完 json 不用重启服务">重载插件</button>
+  <button id="btnRefresh">刷新</button>
+  <button id="btnHome">回创作台</button>
+</header>
+
+<div class="layout">
+  <aside id="list"><div class="empty">加载中…</div></aside>
+  <main id="main"><div class="empty">左侧选一个插件</div></main>
+</div>
+
+<script>
+const api = async (path, body) => {
+  const opt = body === undefined ? {} : {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  };
+  const res = await fetch(path, opt);
+  let data = null;
+  try { data = await res.json(); } catch (e) { data = {error: '返回不是 JSON'}; }
+  if (!res.ok) throw Object.assign(new Error(data.error || ('HTTP ' + res.status)), {data, status: res.status});
+  return data;
+};
+
+let PLUGINS = [];
+let CURRENT = null;
+let POLL = null;
+let ROUTES = null;          // /api/plugins/routes 的快照：谁声明了哪条接口、是否生效
+
+function routePaths(p) {
+  return (p && p.routes ? p.routes : []).map(r => (typeof r === 'string' ? r : (r && r.path) || '')).filter(Boolean);
+}
+
+function routeBadge(p) {
+  const paths = routePaths(p);
+  if (!paths.length) return '';
+  const active = paths.filter(x => isRouteActive(p.id, x));
+  const cls = active.length ? 'badge on' : 'badge';
+  return `<span class="${cls}" title="${active.length ? '已接管该接口：请求会交给本插件处理' : '已声明但未接管：开关未放行或插件非 ok'}">接管 ${esc(paths.join(' '))}</span>`;
+}
+
+function isRouteActive(pid, path) {
+  const rows = (ROUTES && ROUTES.routes) || [];
+  return rows.some(r => r.active && r.plugin === pid && r.path === path);
+}
+
+function routeRow(pid, path) {
+  const rows = (ROUTES && ROUTES.routes) || [];
+  return rows.find(r => r.plugin === pid && r.path === path) || null;
+}
+
+function routeDetailHtml(p) {
+  const paths = routePaths(p);
+  if (!paths.length) return '';
+  const lines = paths.map(pth => {
+    const row = routeRow(p.id, pth);
+    const cls = row && row.active ? 'status ok' : 'status';
+    const why = row ? (row.why || '') : '接管映射里没有这条声明（可能被别的插件冲突作废）';
+    return `<div class="${cls}"><code>${esc(pth)}</code> — ${esc(why)}</div>`;
+  }).join('');
+  return `<details class="sec"><summary>路由接管（默认关闭，靠 JJOS_PLUGIN_TAKEOVER 放行）</summary>${lines}</details>`;
+}
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  })[c]);
+}
+
+async function loadRoutes(force) {
+  // 接管映射是可观测项，读失败不该把插件清单一起拖下水
+  try {
+    ROUTES = await api('/api/plugins/routes' + (force ? '?refresh=1' : ''));
+  } catch (e) {
+    ROUTES = {routes: [], enabled: false, why: '接管映射读取失败: ' + e.message};
+  }
+  return ROUTES;
+}
+
+function routeSummary() {
+  const R = ROUTES || {};
+  const rows = R.routes || [];
+  if (!rows.length) return '未声明可接管接口';
+  const act = rows.filter(r => r.active).length;
+  return `接管 ${act}/${rows.length}${R.enabled ? '' : '（开关关闭）'}`;
+}
+
+async function loadPlugins(force) {
+  const list = document.getElementById('list');
+  try {
+    const [data] = await Promise.all([api('/api/plugins' + (force ? '?refresh=1' : '')), loadRoutes(force)]);
+    PLUGINS = data.plugins || [];
+    document.getElementById('verLine').textContent =
+      `协议 v${data.api_version} · ${data.count} 个插件 · ok ${(data.counts||{}).ok||0} / degraded ${(data.counts||{}).degraded||0} / disabled ${(data.counts||{}).disabled||0} · ${routeSummary()}`;
+    if (!PLUGINS.length) {
+      list.innerHTML = '<div class="empty">plugins/ 目录为空。<br>把 templates/plugin-starter 复制过去改个名就有了。</div>';
+      return;
+    }
+    list.innerHTML = PLUGINS.map(p => `
+      <div class="pcard ${CURRENT && CURRENT.id === p.id ? 'active' : ''}" data-id="${esc(p.id)}">
+        <div class="t">
+          <span>${esc(p.name || p.id)}</span>
+          <span class="grow"></span>
+          <span class="pill ${esc(p.status)}">${esc(p.status)}</span>
+        </div>
+        <div class="d">${esc(p.kind)} · v${esc(p.version || '?')}</div>
+        ${routePaths(p).length ? `<div class="d">${routeBadge(p)}</div>` : ''}
+        ${p.reason ? `<div class="d" style="color:var(--err)">${esc(p.reason)}</div>` : ''}
+      </div>`).join('');
+    list.querySelectorAll('.pcard').forEach(el =>
+      el.addEventListener('click', () => selectPlugin(el.dataset.id)));
+  } catch (e) {
+    list.innerHTML = `<div class="empty" style="color:var(--err)">清单读取失败：${esc(e.message)}</div>`;
+  }
+}
+
+function fieldHtml(f) {
+  const k = `f_${f.key}`;
+  const label = `<label for="${k}">${esc(f.label || f.key)}
+      <span class="hint">${esc(f.key)}</span>${f.required ? ' <span style="color:var(--err)">*</span>' : ''}</label>`;
+  const hint = f.help ? `<div class="hint" style="margin:-2px 0 5px">${esc(f.help)}</div>` : '';
+  const dv = f.default === undefined || f.default === null ? '' : f.default;
+  switch (f.type) {
+    case 'textarea':
+      return `<div class="field">${label}${hint}
+        <textarea id="${k}" data-key="${esc(f.key)}" placeholder="${esc(f.placeholder||'')}">${esc(dv)}</textarea></div>`;
+    case 'number':
+      return `<div class="field">${label}${hint}
+        <input type="number" id="${k}" data-key="${esc(f.key)}" value="${esc(dv)}"
+          ${f.min !== undefined ? `min="${f.min}"` : ''} ${f.max !== undefined ? `max="${f.max}"` : ''}
+          step="${f.step || 1}"></div>`;
+    case 'slider':
+      return `<div class="field">${label}${hint}
+        <div class="row">
+          <input type="range" id="${k}" data-key="${esc(f.key)}" value="${esc(dv)}"
+            min="${f.min !== undefined ? f.min : 0}" max="${f.max !== undefined ? f.max : 1}" step="${f.step || 0.1}">
+          <span class="val" id="${k}_v">${esc(dv)}</span>
+        </div></div>`;
+    case 'toggle':
+      return `<div class="field">${label}${hint}
+        <label class="switch"><input type="checkbox" id="${k}" data-key="${esc(f.key)}" data-type="toggle"
+          ${dv === true || dv === 'true' ? 'checked' : ''}> <span>启用</span></label></div>`;
+    case 'select': {
+      const opts = (f.options || []).map(o =>
+        `<option value="${esc(o)}" ${String(o) === String(dv) ? 'selected' : ''}>${esc(o)}</option>`).join('');
+      return `<div class="field">${label}${hint}
+        <select id="${k}" data-key="${esc(f.key)}">${opts || '<option value="">（无可选项）</option>'}</select>
+        ${f.source ? `<div class="hint" style="margin-top:4px">选项来源：${esc(f.source)}（刷新一次即取本机实际可用项）</div>` : ''}
+      </div>`;
+    }
+    case 'seed':
+      return `<div class="field">${label}${hint}
+        <div class="row">
+          <input type="number" id="${k}" data-key="${esc(f.key)}" value="${esc(dv)}" step="1" style="flex:1">
+          <button type="button" data-reroll="${esc(f.key)}">随机</button>
+        </div></div>`;
+    case 'images': {
+      // 多素材位：一行一个，提交时拆成数组（对应 io.json 的 images 类型）
+      const list = Array.isArray(f.default) ? f.default.join('\n') : (f.default || '');
+      return `<div class="field">${label}${hint}
+        <textarea id="${k}" data-key="${esc(f.key)}" data-list="1" rows="3"
+          placeholder="每行一个素材名或绝对路径（上限 ${esc(String(f.max_items || 8))} 个）">${esc(list)}</textarea></div>`;
+    }
+    case 'image': case 'video': case 'file':
+      return `<div class="field">${label}${hint}
+        <input type="text" id="${k}" data-key="${esc(f.key)}" value="${esc(dv)}"
+          placeholder="填绝对路径或素材名（会做越权校验）"></div>`;
+    default:
+      return `<div class="field">${label}${hint}
+        <input type="text" id="${k}" data-key="${esc(f.key)}" value="${esc(dv)}"></div>`;
+  }
+}
+
+function formHtml(plugin) {
+  const form = plugin.form || [];
+  const groups = (plugin.schema && plugin.schema.groups) || [];
+  const gMap = {};
+  groups.forEach(g => gMap[g.key] = g.label);
+  const order = groups.map(g => g.key);
+  const buckets = {};
+  form.forEach(f => {
+    const g = f.group || 'basic';
+    (buckets[g] = buckets[g] || []).push(f);
+  });
+  const tiers = (plugin.schema && plugin.schema.tiers) || [];
+  let html = '';
+  order.forEach(gk => {
+    if (!buckets[gk]) return;
+    const isAdv = gk !== order[0];
+    html += `<div class="group">
+      <div class="group-title ${isAdv ? 'collapsible' : ''}">${esc(gMap[gk] || gk)}
+        <span class="cnt">${buckets[gk].length}</span></div>
+      <div class="gbody">${buckets[gk].map(fieldHtml).join('')}</div></div>`;
+  });
+  Object.keys(buckets).forEach(gk => {
+    if (order.includes(gk)) return;
+    html += `<div class="group"><div class="group-title">${esc(gMap[gk] || gk)}</div>
+      <div class="gbody">${buckets[gk].map(fieldHtml).join('')}</div></div>`;
+  });
+  if (tiers.length) {
+    html += `<div class="field" style="max-width:320px">
+      <label for="f_tier">画质档位 <span class="hint">tier</span></label>
+      <select id="f_tier">${tiers.map((t, i) =>
+        `<option value="${esc(t)}" ${i === 1 ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></div>`;
+  }
+  return html;
+}
+
+function bindForm(plugin) {
+  document.querySelectorAll('input[type=range]').forEach(el => {
+    const out = document.getElementById(el.id + '_v');
+    el.addEventListener('input', () => { if (out) out.textContent = el.value; });
+  });
+  document.querySelectorAll('[data-reroll]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById('f_' + btn.dataset.reroll).value = Math.floor(Math.random() * 2 ** 31);
+    });
+  });
+  document.querySelectorAll('.group-title.collapsible').forEach(t => {
+    const body = t.nextElementSibling;
+    let hidden = false;
+    t.addEventListener('click', () => {
+      hidden = !hidden;
+      body.style.display = hidden ? 'none' : '';
+      t.querySelector('.cnt').textContent = hidden ? '已收起' : '';
+    });
+  });
+}
+
+function collectInputs() {
+  const out = {};
+  document.querySelectorAll('[data-key]').forEach(el => {
+    const key = el.dataset.key;
+    let v;
+    if (el.type === 'checkbox') v = el.checked;
+    else if (el.type === 'number' || el.type === 'range') {
+      v = el.value === '' ? null : Number(el.value);
+    } else v = el.value;
+    // 多素材位（type=images）按行拆数组，空行丢弃
+    if (el.dataset.list) {
+      v = String(v).split('\n').map(x => x.trim()).filter(Boolean);
+    }
+    if (v !== null) out[key] = v;
+  });
+  Object.keys(out).forEach(k => { if (out[k] === null) delete out[k]; });
+  return out;
+}
+
+async function selectPlugin(id) {
+  if (POLL) { clearInterval(POLL); POLL = null; }
+  document.querySelectorAll('.pcard').forEach(el =>
+    el.classList.toggle('active', el.dataset.id === id));
+  const main = document.getElementById('main');
+  main.innerHTML = '<div class="empty">读取插件契约…</div>';
+  try {
+    if (!ROUTES) await loadRoutes();
+    const plugin = await api('/api/plugins/detail?id=' + encodeURIComponent(id));
+    CURRENT = plugin;
+    const tierSel = (plugin.schema && plugin.schema.tiers) || [];
+    main.innerHTML = `
+      <h2>${esc(plugin.name || plugin.id)} <span class="badge">${esc(plugin.id)}</span>${plugin.has_handler ? '<span class="badge">代码钩子</span>' : ''}${routeBadge(plugin)}</h2>
+      <div class="meta">
+        <span>kind: ${esc(plugin.kind)}</span>
+        <span>version: ${esc(plugin.version || '?')}</span>
+        <span>api: v${esc(plugin.api_version)}</span>
+        <span class="pill ${esc(plugin.status)}">${esc(plugin.status)}</span>
+        ${plugin.workflow_nodes ? `<span>工作流节点: ${plugin.workflow_nodes}</span>` : ''}
+      </div>
+      ${plugin.reason ? `<div class="status err" style="margin-bottom:12px">${esc(plugin.reason)}</div>` : ''}
+      ${(plugin.errors || []).length ? `<pre style="max-height:160px;color:#f0a0a8">${esc(plugin.errors.join('\n'))}</pre>` : ''}
+      ${(plugin.warnings || []).length ? `<pre style="max-height:120px">${esc(plugin.warnings.join('\n'))}</pre>` : ''}
+      ${routeDetailHtml(plugin)}
+      <div id="form">${formHtml(plugin)}</div>
+      <div class="actions">
+        <button class="primary" id="btnRun" ${plugin.status !== 'ok' ? 'disabled' : ''}>提交生成</button>
+        <button id="btnPreview">只预览工作流</button>
+        <span class="status" id="opStatus"></span>
+      </div>
+      <div id="result"></div>
+      <details class="sec"><summary>调用示例（curl）</summary>
+        <pre>curl -X POST http://127.0.0.1:8890/api/plugins/run -H "Content-Type: application/json" -d '${esc(JSON.stringify({id: plugin.id, tier: tierSel[1] || '', inputs: {}}))}'</pre>
+      </details>`;
+    bindForm(plugin);
+    document.getElementById('btnRun').addEventListener('click', runCurrent);
+    document.getElementById('btnPreview').addEventListener('click', previewCurrent);
+  } catch (e) {
+    main.innerHTML = `<div class="empty" style="color:var(--err)">${esc(e.message)}</div>`;
+  }
+}
+
+function setStatus(text, cls) {
+  const el = document.getElementById('opStatus');
+  if (!el) return;
+  el.className = 'status ' + (cls || '');
+  el.textContent = text || '';
+}
+
+async function previewCurrent() {
+  if (!CURRENT) return;
+  setStatus('渲染中…');
+  const body = {id: CURRENT.id, inputs: collectInputs()};
+  const tierEl = document.getElementById('f_tier');
+  if (tierEl) body.tier = tierEl.value;
+  try {
+    const data = await api('/api/plugins/preview', body);
+    document.getElementById('result').innerHTML =
+      `<details class="sec" open><summary>渲染后的工作流（${data.nodes} 节点 / ${data.bytes} 字节）</summary>
+       <pre>${esc(JSON.stringify(data.workflow, null, 2))}</pre></details>`;
+    setStatus('渲染完成，未提交', 'ok');
+  } catch (e) {
+    const d = (e.data && e.data.errors) ? e.data.errors.join('；') : e.message;
+    setStatus('渲染失败：' + d, 'err');
+    document.getElementById('result').innerHTML = '';
+  }
+}
+
+async function runCurrent() {
+  if (!CURRENT) return;
+  const btn = document.getElementById('btnRun');
+  btn.disabled = true;
+  setStatus('提交中…');
+  const body = {id: CURRENT.id, inputs: collectInputs()};
+  const tierEl = document.getElementById('f_tier');
+  if (tierEl) body.tier = tierEl.value;
+  try {
+    const data = await api('/api/plugins/run', body);
+    setStatus(`已提交 · job ${data.job_id}`, 'ok');
+    document.getElementById('result').innerHTML =
+      `<div class="status">job_id: <code>${esc(data.job_id)}</code> · seed: ${esc(data.seed)}</div>
+       <div class="thumbs" id="thumbs"></div>`;
+    watchJob(data.job_id);
+  } catch (e) {
+    const d = (e.data && e.data.errors) ? e.data.errors.join('；') : e.message;
+    setStatus('提交失败：' + d, 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function pickImages(job) {
+  const bag = [];
+  const walk = v => {
+    if (!v) return;
+    if (typeof v === 'string') {
+      if (/\.(png|jpg|jpeg|webp|gif)$/i.test(v)) bag.push(v);
+    } else if (Array.isArray(v)) v.forEach(walk);
+    else if (typeof v === 'object') Object.values(v).forEach(walk);
+  };
+  walk(job);
+  return [...new Set(bag)];
+}
+
+function watchJob(jobId) {
+  if (POLL) clearInterval(POLL);
+  let n = 0;
+  POLL = setInterval(async () => {
+    n++;
+    try {
+      const job = await api('/api/job?id=' + encodeURIComponent(jobId));
+      const st = job.status || job.state || 'unknown';
+      setStatus(`job ${jobId} · ${st}${job.progress ? ' · ' + JSON.stringify(job.progress) : ''}`,
+                st === 'done' || st === 'success' ? 'ok' : '');
+      const imgs = pickImages(job);
+      const box = document.getElementById('thumbs');
+      if (box && imgs.length) {
+        box.innerHTML = imgs.slice(0, 8).map(p =>
+          `<a href="/api/file?path=${encodeURIComponent(p)}" target="_blank">
+             <img src="/api/file?path=${encodeURIComponent(p)}" alt=""></a>`).join('');
+      }
+      if (['done', 'success', 'error', 'failed'].includes(st) || n > 240) {
+        clearInterval(POLL); POLL = null;
+      }
+    } catch (e) {
+      setStatus('查询任务失败：' + e.message, 'err');
+      clearInterval(POLL); POLL = null;
+    }
+  }, 2500);
+}
+
+document.getElementById('btnRefresh').addEventListener('click', () => loadPlugins(false));
+document.getElementById('btnReload').addEventListener('click', async () => {
+  const btn = document.getElementById('btnReload');
+  btn.disabled = true;
+  try {
+    const data = await api('/api/plugins/reload', {});
+    await loadPlugins(false);
+    if (CURRENT) selectPlugin(CURRENT.id);
+    document.getElementById('verLine').textContent += ` · 已于 ${new Date().toLocaleTimeString()} 重载`;
+  } catch (e) {
+    alert('重载失败：' + e.message);
+  } finally { btn.disabled = false; }
+});
+document.getElementById('btnHome').addEventListener('click', () => location.href = '/');
+
+loadPlugins(false).then(() => {
+  if (PLUGINS.length) selectPlugin(PLUGINS[0].id);
+});
+</script>
+</body>
+</html>

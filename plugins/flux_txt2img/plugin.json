@@ -1,0 +1,32 @@
+{
+  "id": "flux_txt2img",
+  "name": "FLUX 文生图",
+  "version": "0.1.0",
+  "api_version": 1,
+  "kind": "image",
+  "author": "JJOS",
+  "license": "MIT",
+  "description": "FLUX 底模 + 双 CLIP 文生图。与 /api/flux/txt2img 等价的工作流镜像。",
+  "tags": [
+    "builtin-mirror",
+    "image"
+  ],
+  "requires": {
+    "engine": "comfyui",
+    "min_app_version": "0.2.0",
+    "custom_nodes": [],
+    "models": [
+      {
+        "file": "flux-vae-bf16.safetensors",
+        "min_size_mb": 100
+      },
+      {
+        "file": "flux1-dev-fp8.safetensors",
+        "min_size_mb": 100
+      }
+    ],
+    "vram_gb": 7,
+    "inputs_dir": []
+  },
+  "builtin": "wf_flux_txt2img"
+}

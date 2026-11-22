@@ -1,0 +1,91 @@
+{
+  "inputs": [
+    {
+      "key": "end_image",
+      "type": "image",
+      "label": "尾帧图",
+      "group": "basic",
+      "help": "给首尾帧模式用；不填则退化为单图",
+      "default": "",
+      "order": 1
+    },
+    {
+      "key": "image",
+      "type": "image",
+      "label": "输入图",
+      "group": "basic",
+      "required": true,
+      "default": "",
+      "order": 2
+    },
+    {
+      "key": "negative",
+      "type": "textarea",
+      "label": "负向提示词",
+      "group": "basic",
+      "placeholder": "不希望出现的内容",
+      "help": "留空则用内置默认负向词",
+      "default": "色调艳丽，过曝，静态，细节模糊不清，字幕，画面整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景",
+      "order": 3
+    },
+    {
+      "key": "prompt",
+      "type": "textarea",
+      "label": "正向提示词",
+      "group": "basic",
+      "placeholder": "描述画面主体、动作、镜头与风格",
+      "required": true,
+      "default": "一只橘猫坐在窗台上",
+      "order": 4
+    },
+    {
+      "key": "fps",
+      "type": "number",
+      "label": "帧率",
+      "group": "advanced",
+      "min": 8,
+      "max": 30,
+      "step": 1,
+      "default": 16.0,
+      "order": 5
+    },
+    {
+      "key": "prefix",
+      "type": "text",
+      "label": "文件名前缀",
+      "group": "advanced",
+      "default": "localjimeng/i2v",
+      "order": 6
+    },
+    {
+      "key": "seed",
+      "type": "seed",
+      "label": "种子",
+      "group": "advanced",
+      "default": -1,
+      "order": 7
+    }
+  ],
+  "outputs": [
+    {
+      "key": "video",
+      "type": "video",
+      "label": "Wan2.2 首尾帧视频"
+    }
+  ],
+  "tiers": [
+    "draft",
+    "balanced",
+    "final"
+  ],
+  "groups": [
+    {
+      "key": "basic",
+      "label": "基础"
+    },
+    {
+      "key": "advanced",
+      "label": "高级"
+    }
+  ]
+}

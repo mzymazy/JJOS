@@ -1,0 +1,173 @@
+{
+  "inputs": [
+    {
+      "key": "image",
+      "type": "image",
+      "label": "输入图",
+      "group": "basic",
+      "required": true,
+      "default": "",
+      "order": 1
+    },
+    {
+      "key": "mask",
+      "type": "image",
+      "label": "蒙版图",
+      "group": "basic",
+      "help": "白色区域是要重绘的范围",
+      "required": true,
+      "default": "",
+      "order": 2
+    },
+    {
+      "key": "negative",
+      "type": "textarea",
+      "label": "负向提示词",
+      "group": "basic",
+      "placeholder": "不希望出现的内容",
+      "help": "留空则用内置默认负向词",
+      "default": "",
+      "order": 3
+    },
+    {
+      "key": "prompt",
+      "type": "textarea",
+      "label": "正向提示词",
+      "group": "basic",
+      "placeholder": "描述画面主体、动作、镜头与风格",
+      "required": true,
+      "default": "一只橘猫坐在窗台上",
+      "order": 4
+    },
+    {
+      "key": "unet",
+      "type": "select",
+      "label": "主模型",
+      "group": "basic",
+      "options": [
+        "flux1-dev-kontext_fp8_scaled.safetensors"
+      ],
+      "default": "flux1-dev-kontext_fp8_scaled.safetensors",
+      "order": 5
+    },
+    {
+      "key": "cfg",
+      "type": "slider",
+      "label": "CFG",
+      "group": "advanced",
+      "min": 1,
+      "max": 15,
+      "step": 0.1,
+      "default": 1.0,
+      "order": 6
+    },
+    {
+      "key": "guidance",
+      "type": "slider",
+      "label": "引导强度",
+      "group": "advanced",
+      "min": 0,
+      "max": 10,
+      "step": 0.1,
+      "default": 2.5,
+      "order": 7
+    },
+    {
+      "key": "prefix",
+      "type": "text",
+      "label": "文件名前缀",
+      "group": "advanced",
+      "default": "localjimeng/kinpaint",
+      "order": 8
+    },
+    {
+      "key": "sampler",
+      "type": "select",
+      "label": "采样器",
+      "group": "advanced",
+      "options": [
+        "euler",
+        "euler_ancestral",
+        "dpmpp_2m",
+        "dpmpp_2m_sde",
+        "dpm_2",
+        "ddim",
+        "uni_pc",
+        "res_multistep"
+      ],
+      "default": "euler",
+      "source": "comfy:samplers",
+      "order": 9
+    },
+    {
+      "key": "scheduler",
+      "type": "select",
+      "label": "调度器",
+      "group": "advanced",
+      "options": [
+        "simple",
+        "normal",
+        "karras",
+        "exponential",
+        "sgm_uniform",
+        "beta",
+        "ddim_uniform"
+      ],
+      "default": "simple",
+      "source": "comfy:schedulers",
+      "order": 10
+    },
+    {
+      "key": "seed",
+      "type": "seed",
+      "label": "种子",
+      "group": "advanced",
+      "default": -1,
+      "order": 11
+    },
+    {
+      "key": "steps",
+      "type": "number",
+      "label": "步数",
+      "group": "advanced",
+      "min": 1,
+      "max": 80,
+      "step": 1,
+      "default": 20,
+      "order": 12
+    },
+    {
+      "key": "vae",
+      "type": "select",
+      "label": "VAE",
+      "group": "advanced",
+      "options": [
+        "flux-vae-bf16.safetensors"
+      ],
+      "default": "flux-vae-bf16.safetensors",
+      "order": 13
+    }
+  ],
+  "outputs": [
+    {
+      "key": "image",
+      "type": "image",
+      "label": "FLUX Kontext 局部重绘"
+    }
+  ],
+  "tiers": [
+    "draft",
+    "balanced",
+    "final"
+  ],
+  "groups": [
+    {
+      "key": "basic",
+      "label": "基础"
+    },
+    {
+      "key": "advanced",
+      "label": "高级"
+    }
+  ]
+}

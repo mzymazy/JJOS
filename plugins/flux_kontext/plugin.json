@@ -1,0 +1,32 @@
+{
+  "id": "flux_kontext",
+  "name": "FLUX Kontext 改图",
+  "version": "0.1.0",
+  "api_version": 1,
+  "kind": "image",
+  "author": "JJOS",
+  "license": "MIT",
+  "description": "单图指令式改图：一句话说明改什么，其余保持不变。与 /api/flux/kontext 等价的工作流镜像。",
+  "tags": [
+    "builtin-mirror",
+    "image"
+  ],
+  "requires": {
+    "engine": "comfyui",
+    "min_app_version": "0.2.0",
+    "custom_nodes": [],
+    "models": [
+      {
+        "file": "flux-vae-bf16.safetensors",
+        "min_size_mb": 100
+      },
+      {
+        "file": "flux1-dev-kontext_fp8_scaled.safetensors",
+        "min_size_mb": 100
+      }
+    ],
+    "vram_gb": 7,
+    "inputs_dir": []
+  },
+  "builtin": "wf_flux_kontext"
+}

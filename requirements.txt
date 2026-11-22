@@ -1,0 +1,16 @@
+# 运行时依赖：无（强制依赖为零；numpy / PIL 仅作可选加速，缺失时自动降级，勿写入本文件）。
+#
+# 本项目的 HTTP 服务、路由、插件加载、任务持久化全部基于 Python 标准库实现，
+# 不引入 Flask/FastAPI/requests 等任何第三方包，拷到只装了 Python 的机器上就能跑。
+#
+# 但要注意"标准库之外"的三样东西，它们不是 pip 包，装不上就得手工准备：
+#   1. ComfyUI     —— 本机另装，默认 http://127.0.0.1:8199（LOCALJIMENG_COMFY 可改）
+#   2. Ollama      —— 本机另装，默认 http://127.0.0.1:11434（LOCALJIMENG_OLLAMA 可改）
+#   3. ComfyUI 权重 —— 见 models_profile.json 的 model 字段，缺哪个 /api/engines/check 会报
+#
+# Python 版本：>= 3.9（用到 f-string、dict 合并运算符、type hint 的简化写法）
+#
+# 开发/测试依赖：同样无。tests/ 下全部是 unittest，跑法见 tests/run_tests.py。
+#
+# 占位说明：本文件列出为空是刻意的，请不要随手 pip freeze 覆盖它，
+# 否则会把开发机上的无关包（如 numpy/torch）写进来，违背"零依赖直跑"的设计。

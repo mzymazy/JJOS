@@ -1,0 +1,545 @@
+/* ============================================================
+   创作台 Pro · 视觉主题层
+   - 不修改任何 DOM 结构与元素 id，纯样式覆盖
+   - 四套主题：aurora（极光玻璃）/ graphite（石墨极简）/ clay（暖调工作室）/ classic（原始）
+   - 加载位置：studio.html 内联 <style> 之后，确保同级选择器后者生效
+   - 变量前缀 html[data-theme=...] 提升特异性，稳定覆盖内联 :root
+   ============================================================ */
+
+/* ---------- 公共底座 ---------- */
+html[data-theme] body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  font-size:14px;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+  transition:background .35s ease,color .35s ease;
+}
+html[data-theme] *::-webkit-scrollbar{width:10px;height:10px}
+html[data-theme] *::-webkit-scrollbar-track{background:transparent}
+html[data-theme] *::-webkit-scrollbar-thumb{border-radius:8px;border:2px solid transparent;background-clip:content-box}
+html[data-theme] *{scrollbar-width:thin}
+
+html[data-theme] header{border-bottom:1px solid var(--line);transition:background .3s}
+html[data-theme] header h1{letter-spacing:.2px}
+html[data-theme] header .sub{font-size:12px;letter-spacing:.2px}
+
+html[data-theme] .panel{transition:background .3s,border-color .3s,box-shadow .3s}
+html[data-theme] .mode{transition:transform .16s ease,border-color .16s ease,background .16s ease,color .16s ease,box-shadow .16s ease}
+html[data-theme] .mode:active{transform:scale(.97)}
+html[data-theme] .btn{transition:transform .14s ease,filter .14s ease,border-color .14s ease,background .14s ease,box-shadow .14s ease}
+html[data-theme] .btn:active{transform:translateY(1px) scale(.995)}
+html[data-theme] .btn:focus-visible,
+html[data-theme] .mode:focus-visible,
+html[data-theme] input:focus-visible,
+html[data-theme] textarea:focus-visible,
+html[data-theme] select:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+html[data-theme] textarea{resize:vertical}
+html[data-theme] label.f{letter-spacing:.3px;font-weight:500}
+html[data-theme] .card{transition:border-color .2s,box-shadow .2s,transform .2s}
+html[data-theme] .card:hover{transform:translateY(-1px)}
+html[data-theme] .drop{transition:border-color .18s,color .18s,background .18s}
+html[data-theme] .chip{transition:all .15s ease}
+html[data-theme] .refpanel .it img{transition:transform .25s ease}
+html[data-theme] .refpanel .it:hover img{transform:scale(1.06)}
+html[data-theme] #toast{backdrop-filter:blur(12px)}
+
+/* ============================================================
+   主题 A · aurora —— 极光玻璃，深空底 + 紫青极光 + 玻璃拟态
+   ============================================================ */
+html[data-theme="aurora"]{
+  --bg:#07080f;
+  --panel:rgba(21,25,38,.62);
+  --panel2:rgba(28,33,50,.72);
+  --line:rgba(126,146,198,.16);
+  --text:#eef1fb;
+  --dim:#98a2bd;
+  --acc:#8b8cff;
+  --ok:#3ddc97;
+  --warn:#ffc46b;
+  --lj-hi:#5fe3d8;
+  --lj-glow:rgba(139,140,255,.34);
+}
+html[data-theme="aurora"] body{
+  background:
+    radial-gradient(900px 520px at 12% -8%,rgba(96,84,220,.30) 0%,transparent 62%),
+    radial-gradient(760px 460px at 88% 4%,rgba(34,182,190,.18) 0%,transparent 60%),
+    radial-gradient(680px 520px at 50% 112%,rgba(88,64,180,.16) 0%,transparent 58%),
+    #07080f;
+  background-attachment:fixed;
+  color:var(--text);
+}
+html[data-theme="aurora"] header{
+  background:rgba(9,11,19,.55);
+  backdrop-filter:blur(18px) saturate(150%);
+  border-bottom:1px solid rgba(126,146,198,.14);
+}
+html[data-theme="aurora"] header h1{
+  font-size:16.5px;
+  background:linear-gradient(92deg,#fff 10%,#b9b7ff 52%,#7fe6dd 96%);
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
+  color:#fff;
+}
+html[data-theme="aurora"] header a{
+  border-radius:10px;
+  border-color:rgba(126,146,198,.2);
+  background:rgba(255,255,255,.02);
+  transition:all .18s;
+}
+html[data-theme="aurora"] header a:hover{
+  border-color:rgba(139,140,255,.55);
+  background:rgba(139,140,255,.1);
+  box-shadow:0 0 18px rgba(139,140,255,.22);
+}
+html[data-theme="aurora"] .wrap{grid-template-columns:396px 1fr;gap:22px;padding-top:22px}
+html[data-theme="aurora"] .panel,
+html[data-theme="aurora"] .card{
+  background:linear-gradient(168deg,rgba(30,35,54,.72),rgba(16,19,30,.66));
+  backdrop-filter:blur(16px) saturate(140%);
+  border:1px solid rgba(126,146,198,.16);
+  border-radius:16px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.055),0 18px 40px -24px rgba(0,0,0,.85);
+}
+html[data-theme="aurora"] .card:hover{
+  border-color:rgba(139,140,255,.34);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 22px 48px -22px rgba(70,60,180,.55);
+}
+html[data-theme="aurora"] .modes{gap:7px}
+html[data-theme="aurora"] .mode{
+  border-radius:11px;
+  border:1px solid rgba(126,146,198,.14);
+  background:rgba(255,255,255,.022);
+  color:#9aa4be;
+  padding:9px 6px;
+  font-size:12px;
+}
+html[data-theme="aurora"] .mode:hover{
+  color:#e7eaf7;
+  border-color:rgba(139,140,255,.4);
+  background:rgba(139,140,255,.09);
+}
+html[data-theme="aurora"] .mode.on{
+  color:#fff;
+  border-color:transparent;
+  background:
+    linear-gradient(rgba(37,42,72,.96),rgba(28,32,56,.96)) padding-box,
+    linear-gradient(135deg,#8b8cff,#5fe3d8) border-box;
+  border:1px solid transparent;
+  box-shadow:0 0 0 1px rgba(139,140,255,.18),0 8px 22px -12px rgba(120,120,255,.65);
+}
+html[data-theme="aurora"] textarea,
+html[data-theme="aurora"] input[type=text],
+html[data-theme="aurora"] input[type=number],
+html[data-theme="aurora"] select{
+  background:rgba(9,11,19,.62);
+  border:1px solid rgba(126,146,198,.18);
+  border-radius:11px;
+  color:#eef1fb;
+  transition:border-color .18s,box-shadow .18s,background .18s;
+}
+html[data-theme="aurora"] textarea:focus,
+html[data-theme="aurora"] input:focus,
+html[data-theme="aurora"] select:focus{
+  outline:none;
+  border-color:rgba(139,140,255,.7);
+  background:rgba(9,11,19,.85);
+  box-shadow:0 0 0 3px rgba(139,140,255,.16),0 0 22px -6px rgba(139,140,255,.4);
+}
+html[data-theme="aurora"] .btn{
+  border-radius:11px;
+  border:1px solid rgba(126,146,198,.18);
+  background:rgba(255,255,255,.03);
+  color:#dfe4f3;
+}
+html[data-theme="aurora"] .btn:hover{
+  border-color:rgba(139,140,255,.45);
+  background:rgba(139,140,255,.1);
+  color:#fff;
+}
+html[data-theme="aurora"] .btn.ghost{background:transparent}
+html[data-theme="aurora"] .btn.primary{
+  border:1px solid transparent;
+  background:linear-gradient(96deg,#7b7dff,#6b6ef5 46%,#43cfc6);
+  box-shadow:0 10px 26px -12px rgba(120,120,255,.85),inset 0 1px 0 rgba(255,255,255,.28);
+  letter-spacing:.5px;
+}
+html[data-theme="aurora"] .btn.primary:hover{
+  filter:brightness(1.1);
+  box-shadow:0 14px 34px -12px rgba(120,120,255,.95),inset 0 1px 0 rgba(255,255,255,.32);
+}
+html[data-theme="aurora"] .drop{
+  border:1.5px dashed rgba(126,146,198,.3);
+  border-radius:13px;
+  background:rgba(9,11,19,.3);
+}
+html[data-theme="aurora"] .drop:hover{
+  border-color:rgba(139,140,255,.7);
+  background:rgba(139,140,255,.07);
+  color:#e8ebf8;
+}
+html[data-theme="aurora"] .chip{
+  border-radius:9px;
+  border:1px solid rgba(126,146,198,.18);
+  background:rgba(255,255,255,.022);
+  font-size:12px;
+}
+html[data-theme="aurora"] .chip:hover{border-color:rgba(139,140,255,.45);color:#e8ebf8}
+html[data-theme="aurora"] .chip.on{
+  border-color:rgba(139,140,255,.8);
+  background:rgba(139,140,255,.16);
+  color:#fff;
+  box-shadow:0 0 16px -4px rgba(139,140,255,.5);
+}
+html[data-theme="aurora"] .pill{
+  background:rgba(139,140,255,.12);
+  border:1px solid rgba(139,140,255,.22);
+  color:#b9bcf5;
+  border-radius:20px;
+}
+html[data-theme="aurora"] .refpanel{
+  background:rgba(9,11,19,.42);
+  border-color:rgba(126,146,198,.14);
+  border-radius:12px;
+}
+html[data-theme="aurora"] .tag{border-radius:20px}
+html[data-theme="aurora"] .tag.run{color:#ffc46b;border-color:rgba(255,196,107,.35);background:rgba(255,196,107,.1)}
+html[data-theme="aurora"] .tag.done{color:#4ce6a4;border-color:rgba(78,230,164,.32);background:rgba(78,230,164,.1)}
+html[data-theme="aurora"] .tag.fail{color:#ff8b8b;border-color:rgba(255,120,120,.32);background:rgba(255,120,120,.1)}
+html[data-theme="aurora"] .card .out img,
+html[data-theme="aurora"] .card .out video{
+  border-radius:12px;
+  border:1px solid rgba(126,146,198,.18);
+  box-shadow:0 14px 34px -20px rgba(0,0,0,.9);
+}
+html[data-theme="aurora"] #toast{
+  background:rgba(24,28,44,.9);
+  border:1px solid rgba(139,140,255,.3);
+  box-shadow:0 12px 34px -16px rgba(0,0,0,.9);
+}
+html[data-theme="aurora"] *::-webkit-scrollbar-thumb{background:rgba(139,140,255,.28)}
+html[data-theme="aurora"] *::-webkit-scrollbar-thumb:hover{background:rgba(139,140,255,.45)}
+
+/* ============================================================
+   主题 B · graphite —— 石墨极简，无渐变无阴影，靠留白与字重
+   ============================================================ */
+html[data-theme="graphite"]{
+  --bg:#0a0a0b;
+  --panel:#121213;
+  --panel2:#171718;
+  --line:#26262a;
+  --text:#f4f4f5;
+  --dim:#8d8d95;
+  --acc:#f4f4f5;
+  --ok:#4ade80;
+  --warn:#fbbf24;
+}
+html[data-theme="graphite"] body{
+  background:#0a0a0b;
+  color:var(--text);
+  font-size:13.5px;
+}
+html[data-theme="graphite"] header{
+  background:#0a0a0b;
+  padding:14px 28px;
+  border-bottom:1px solid #1e1e21;
+}
+html[data-theme="graphite"] header h1{font-size:14.5px;font-weight:600;letter-spacing:.1px}
+html[data-theme="graphite"] header .sub{font-size:11.5px;color:#6f6f77}
+html[data-theme="graphite"] header a{
+  border-radius:7px;border-color:#26262a;font-size:12.5px;color:#a1a1a9;
+  transition:all .14s;
+}
+html[data-theme="graphite"] header a:hover{
+  color:#f4f4f5;border-color:#3a3a40;background:#171718;
+}
+html[data-theme="graphite"] .wrap{grid-template-columns:360px 1fr;gap:1px;padding:0;max-width:none;background:#1e1e21}
+html[data-theme="graphite"] .panel,
+html[data-theme="graphite"] .card{
+  background:#121213;
+  border:none;
+  border-radius:0;
+  box-shadow:none;
+  padding:20px 22px;
+}
+html[data-theme="graphite"] .card:hover{transform:none;box-shadow:none}
+html[data-theme="graphite"] > .wrap > div:last-child{padding:20px 22px;background:#0a0a0b}
+html[data-theme="graphite"] .wrap > div:last-child > .panel{
+  padding:0 0 14px;
+  margin-bottom:14px !important;
+  border-bottom:1px solid #1e1e21;
+  background:transparent;
+}
+html[data-theme="graphite"] .results{gap:1px;background:#1e1e21}
+html[data-theme="graphite"] .modes{grid-template-columns:repeat(2,1fr);gap:1px;background:#1e1e21;border:1px solid #1e1e21;border-radius:8px;overflow:hidden;margin-bottom:18px}
+html[data-theme="graphite"] .mode{
+  border:none;border-radius:0;background:#121213;color:#8d8d95;
+  padding:11px 8px;font-size:12.5px;position:relative;
+}
+html[data-theme="graphite"] .mode:hover{background:#171718;color:#f4f4f5}
+html[data-theme="graphite"] .mode.on{
+  background:#1c1c1f;color:#fff;font-weight:600;box-shadow:none;
+}
+html[data-theme="graphite"] .mode.on::after{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:#f4f4f5;
+}
+html[data-theme="graphite"] label.f{
+  font-size:11px;text-transform:uppercase;letter-spacing:.9px;color:#787881;font-weight:600;
+  margin:16px 0 7px;
+}
+html[data-theme="graphite"] textarea,
+html[data-theme="graphite"] input[type=text],
+html[data-theme="graphite"] input[type=number],
+html[data-theme="graphite"] select{
+  background:#0f0f10;border:1px solid #26262a;border-radius:7px;color:#f4f4f5;
+  padding:9px 11px;transition:border-color .14s;
+}
+html[data-theme="graphite"] textarea:focus,
+html[data-theme="graphite"] input:focus,
+html[data-theme="graphite"] select:focus{
+  outline:none;border-color:#5a5a63;box-shadow:0 0 0 3px rgba(255,255,255,.06);
+}
+html[data-theme="graphite"] .btn{
+  border-radius:7px;border:1px solid #26262a;background:#171718;color:#e4e4e7;
+  font-size:12.5px;padding:9px 13px;
+}
+html[data-theme="graphite"] .btn:hover{border-color:#3f3f46;background:#1d1d20;color:#fff}
+html[data-theme="graphite"] .btn.ghost{background:transparent}
+html[data-theme="graphite"] .btn.primary{
+  background:#f4f4f5;border-color:#f4f4f5;color:#0a0a0b;font-weight:600;letter-spacing:.2px;
+}
+html[data-theme="graphite"] .btn.primary:hover{background:#fff;filter:none}
+html[data-theme="graphite"] .drop{
+  border:1px dashed #2e2e33;border-radius:8px;background:#0f0f10;color:#787881;
+}
+html[data-theme="graphite"] .drop:hover{border-color:#5a5a63;color:#e4e4e7;background:#141415}
+html[data-theme="graphite"] .chip{
+  border-radius:6px;border:1px solid #26262a;background:transparent;font-size:12px;padding:5px 11px;
+}
+html[data-theme="graphite"] .chip:hover{border-color:#4a4a52;color:#f4f4f5}
+html[data-theme="graphite"] .chip.on{background:#f4f4f5;border-color:#f4f4f5;color:#0a0a0b;font-weight:600}
+html[data-theme="graphite"] .pill{
+  background:transparent;border:1px solid #26262a;color:#8d8d95;border-radius:5px;font-size:11px;
+}
+html[data-theme="graphite"] .refpanel{background:#0f0f10;border-color:#26262a;border-radius:8px}
+html[data-theme="graphite"] .card .hd{font-size:11.5px;letter-spacing:.4px;color:#787881}
+html[data-theme="graphite"] .tag{border-radius:5px;font-size:11px}
+html[data-theme="graphite"] .tag.run{color:#fbbf24;border-color:rgba(251,191,36,.3);background:rgba(251,191,36,.08)}
+html[data-theme="graphite"] .tag.done{color:#4ade80;border-color:rgba(74,222,128,.3);background:rgba(74,222,128,.08)}
+html[data-theme="graphite"] .tag.fail{color:#f87171;border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.08)}
+html[data-theme="graphite"] .card .out img,
+html[data-theme="graphite"] .card .out video{border-radius:6px;border:1px solid #26262a;box-shadow:none}
+html[data-theme="graphite"] .empty{color:#5f5f67;font-size:12.5px}
+html[data-theme="graphite"] #toast{background:#1c1c1f;border:1px solid #33333a;border-radius:8px;box-shadow:0 18px 40px -20px #000}
+html[data-theme="graphite"] *::-webkit-scrollbar-thumb{background:#2e2e33}
+html[data-theme="graphite"] *::-webkit-scrollbar-thumb:hover{background:#45454c}
+
+/* ============================================================
+   主题 C · clay —— 暖调工作室，低对比暖炭底 + 陶土橙
+   ============================================================ */
+html[data-theme="clay"]{
+  --bg:#15110e;
+  --panel:#1f1a16;
+  --panel2:#282119;
+  --line:#3a2f26;
+  --text:#f7efe4;
+  --dim:#ac9a86;
+  --acc:#e2834e;
+  --ok:#7fc08a;
+  --warn:#e0b062;
+}
+html[data-theme="clay"] body{
+  background:
+    radial-gradient(820px 480px at 18% -10%,rgba(200,120,70,.14) 0%,transparent 62%),
+    radial-gradient(700px 460px at 92% 2%,rgba(120,150,120,.08) 0%,transparent 58%),
+    #15110e;
+  background-attachment:fixed;
+  color:var(--text);
+  font-size:14px;
+}
+html[data-theme="clay"] header{
+  background:rgba(21,17,14,.72);
+  backdrop-filter:blur(14px);
+  border-bottom:1px solid #302720;
+}
+html[data-theme="clay"] header h1{font-weight:600;letter-spacing:.4px}
+html[data-theme="clay"] header a{border-radius:9px;border-color:#3a2f26;color:#b4a08c}
+html[data-theme="clay"] header a:hover{border-color:#e2834e;color:#f7efe4;background:rgba(226,131,78,.1)}
+html[data-theme="clay"] .wrap{grid-template-columns:392px 1fr;gap:20px;padding-top:22px}
+html[data-theme="clay"] .panel,
+html[data-theme="clay"] .card{
+  background:#1f1a16;
+  border:1px solid #33291f;
+  border-radius:14px;
+  box-shadow:0 18px 36px -26px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.03);
+}
+html[data-theme="clay"] .card:hover{
+  border-color:#4a3a2c;
+  box-shadow:0 22px 42px -24px rgba(0,0,0,.95),inset 0 1px 0 rgba(255,255,255,.04);
+}
+html[data-theme="clay"] .mode{
+  border-radius:9px;border:1px solid #33291f;background:#282119;color:#a4907a;font-size:12px;
+}
+html[data-theme="clay"] .mode:hover{border-color:#4f3d2d;color:#f7efe4;background:#2e251b}
+html[data-theme="clay"] .mode.on{
+  border-color:#e2834e;color:#fff8ef;
+  background:linear-gradient(180deg,#5a3a22,#42291a);
+  box-shadow:0 0 0 1px rgba(226,131,78,.22) inset,0 8px 18px -12px rgba(226,131,78,.6);
+}
+html[data-theme="clay"] textarea,
+html[data-theme="clay"] input[type=text],
+html[data-theme="clay"] input[type=number],
+html[data-theme="clay"] select{
+  background:#171310;border:1px solid #372c22;border-radius:9px;color:#f7efe4;
+  transition:border-color .18s,box-shadow .18s;
+}
+html[data-theme="clay"] textarea:focus,
+html[data-theme="clay"] input:focus,
+html[data-theme="clay"] select:focus{
+  outline:none;border-color:#c9763f;box-shadow:0 0 0 3px rgba(226,131,78,.14);
+}
+html[data-theme="clay"] .btn{border-radius:9px;border:1px solid #3a2f26;background:#282119;color:#f0e4d6}
+html[data-theme="clay"] .btn:hover{border-color:#58422f;background:#332a20;color:#fff8ef}
+html[data-theme="clay"] .btn.ghost{background:transparent}
+html[data-theme="clay"] .btn.primary{
+  background:linear-gradient(180deg,#e88c57,#d2703c);
+  border-color:#c9763f;color:#fff;font-weight:600;
+  box-shadow:0 10px 24px -14px rgba(226,131,78,.9),inset 0 1px 0 rgba(255,255,255,.22);
+}
+html[data-theme="clay"] .btn.primary:hover{filter:brightness(1.07)}
+html[data-theme="clay"] .drop{border:1.5px dashed #40332a;border-radius:11px;background:#191410;color:#a4907a}
+html[data-theme="clay"] .drop:hover{border-color:#c9763f;color:#f7efe4;background:#211a14}
+html[data-theme="clay"] .chip{border-radius:8px;border:1px solid #372c22;background:#241d16;color:#a4907a;font-size:12px}
+html[data-theme="clay"] .chip:hover{border-color:#59422f;color:#f7efe4}
+html[data-theme="clay"] .chip.on{border-color:#e2834e;background:rgba(226,131,78,.18);color:#fff3e6}
+html[data-theme="clay"] .pill{background:#2b2219;border:1px solid #3a2f26;color:#b09a86;border-radius:20px}
+html[data-theme="clay"] .refpanel{background:#191410;border-color:#33291f;border-radius:11px}
+html[data-theme="clay"] .tag.run{color:#e0b062;border-color:#5c4526;background:#2a2114}
+html[data-theme="clay"] .tag.done{color:#8fce97;border-color:#3a5b3d;background:#1d2a1e}
+html[data-theme="clay"] .tag.fail{color:#e08585;border-color:#5c2f2f;background:#2a1717}
+html[data-theme="clay"] .card .out img,
+html[data-theme="clay"] .card .out video{border-radius:10px;border:1px solid #33291f;box-shadow:0 14px 30px -20px rgba(0,0,0,.95)}
+html[data-theme="clay"] #toast{background:#2a2119;border:1px solid #43352a;border-radius:10px;box-shadow:0 16px 36px -20px #000}
+html[data-theme="clay"] *::-webkit-scrollbar-thumb{background:#40332a}
+html[data-theme="clay"] *::-webkit-scrollbar-thumb:hover{background:#58432f}
+
+/* ============================================================
+   主题切换器（右下角浮层，独立于页面布局，不进 DOM 主流程）
+   ============================================================ */
+#lj-theme-dock{
+  position:fixed;right:18px;bottom:18px;z-index:120;
+  display:flex;align-items:center;gap:6px;
+  padding:7px 9px;
+  border-radius:14px;
+  background:rgba(18,20,28,.82);
+  border:1px solid rgba(140,150,180,.22);
+  backdrop-filter:blur(16px) saturate(140%);
+  box-shadow:0 16px 38px -18px rgba(0,0,0,.85);
+  font:12px/1 "Microsoft YaHei",system-ui,sans-serif;
+  opacity:.55;
+  transition:opacity .2s ease,transform .2s ease;
+  user-select:none;
+}
+#lj-theme-dock:hover{opacity:1;transform:translateY(-2px)}
+#lj-theme-dock .t{
+  color:#8b95a8;font-size:11px;padding:0 4px 0 2px;letter-spacing:.4px;white-space:nowrap;
+}
+#lj-theme-dock button{
+  display:flex;align-items:center;gap:6px;
+  border:1px solid rgba(140,150,180,.18);
+  background:rgba(255,255,255,.03);
+  color:#c8cede;
+  border-radius:9px;
+  padding:6px 10px;
+  cursor:pointer;
+  font:12px/1 inherit;
+  transition:all .15s ease;
+  white-space:nowrap;
+}
+#lj-theme-dock button:hover{border-color:rgba(140,150,180,.5);color:#fff;background:rgba(255,255,255,.07)}
+#lj-theme-dock button.on{border-color:#8b8cff;background:rgba(139,140,255,.16);color:#fff;font-weight:600}
+#lj-theme-dock .dot{
+  width:9px;height:9px;border-radius:50%;flex:none;
+  box-shadow:0 0 0 1px rgba(255,255,255,.18) inset;
+}
+#lj-theme-dock .k{opacity:.5;font-size:10px;margin-left:2px}
+@media(max-width:760px){
+  #lj-theme-dock{right:10px;bottom:10px;gap:4px;padding:6px 7px}
+  #lj-theme-dock .t,#lj-theme-dock .k{display:none}
+  #lj-theme-dock button{padding:6px 8px;font-size:11px}
+}
+
+
+/* ============================================================
+   响应式 · 窄屏与手机端
+   - 主题内写死的双栏 .wrap 在窄屏统一压成单列，避免横向溢出
+   - 触控目标放大、留白收紧、媒体不溢出
+   ============================================================ */
+@media(max-width:1000px){
+  html[data-theme] .wrap{
+    grid-template-columns:1fr!important;
+    gap:14px!important;
+    padding:14px 12px 92px!important;
+    max-width:none!important;
+    background:transparent!important;
+  }
+  html[data-theme="graphite"] > .wrap > div:last-child{
+    padding:14px!important;
+    background:transparent!important;
+  }
+  html[data-theme] header{padding:12px 14px;gap:10px}
+  html[data-theme] header h1{font-size:15px}
+  html[data-theme] header .sub{font-size:11.5px}
+  html[data-theme] header .nav{gap:8px}
+  html[data-theme] header a{padding:5px 9px;font-size:12px}
+}
+
+@media(max-width:620px){
+  html[data-theme] .wrap{padding:10px 10px 96px!important;gap:12px!important}
+  html[data-theme] .modes,
+  html[data-theme="graphite"] .modes{grid-template-columns:repeat(2,1fr)}
+  html[data-theme] .panel{padding:13px}
+  html[data-theme] .card{padding:12px}
+  /* 表单控件保持 16px，避免移动端点按输入框时页面被自动放大 */
+  html[data-theme] input,
+  html[data-theme] select,
+  html[data-theme] textarea{font-size:16px!important}
+  html[data-theme] .chip{font-size:12.5px;padding:7px 12px}
+  html[data-theme] .mode{padding:9px 6px;font-size:11.5px}
+  html[data-theme] .btn{padding:8px 12px;font-size:12.5px}
+  html[data-theme] .results img,
+  html[data-theme] .results video{max-width:100%;height:auto}
+  html[data-theme] .drop{gap:8px}
+}
+
+@media(max-width:620px){
+  /* 顶部栏：窄屏改为两行，状态胶囊与链接不再互相挤压 */
+  html[data-theme] header{flex-wrap:wrap;row-gap:8px}
+  html[data-theme] header h1{display:flex;flex-wrap:wrap;align-items:center;gap:6px;line-height:1.5}
+  html[data-theme] header .pill{font-size:10.5px;padding:2px 7px}
+  html[data-theme] header .nav{margin-left:0;width:100%;justify-content:flex-start}
+  /* 模式按钮：允许折行，长名称不再被切掉 */
+  html[data-theme] .mode{white-space:normal;overflow-wrap:anywhere;line-height:1.4}
+  html[data-theme] .modes{gap:8px}
+}
+
+@media(max-width:620px){
+  /* flex 子项默认 min-width:auto 会被长文本撑破，统一放开收缩 */
+  html[data-theme] header > div{min-width:0}
+  html[data-theme] header > div:first-child{flex:1 1 100%}
+  html[data-theme] header .sub{white-space:normal;overflow-wrap:anywhere;line-height:1.6}
+  html[data-theme] .panel,
+  html[data-theme] .card,
+  html[data-theme] .results,
+  html[data-theme] .row{min-width:0;max-width:100%}
+  html[data-theme] .hint{overflow-wrap:anywhere}
+}
+
+/* ===== 窄屏顶栏状态胶囊排版修正（2026-11-20） ===== */
+@media (max-width:620px){
+  header{gap:8px 10px}
+  header h1{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;font-size:13px;line-height:1.5}
+  header h1 .pill{margin-left:0;font-size:11px;padding:2px 7px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  header .sub{display:block;font-size:11.5px}
+  header .nav{flex:1 1 100%;margin-left:0;justify-content:flex-start;flex-wrap:wrap}
+}

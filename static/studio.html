@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>JJOS 创作台 · 本地 AI 创作台</title>
+<style>
+:root{--bg:#0d0f14;--panel:#161a23;--panel2:#1d2330;--line:#2a3242;--text:#e8ecf4;--dim:#8b95a8;--acc:#5b8cff;--ok:#37c98a;--warn:#ffb35c;--brand:var(--acc);--muted:var(--dim);--err:#ff6b6b;--radius:14px}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(1200px 600px at 20% -10%,#1b2440 0%,var(--bg) 55%);color:var(--text);font:14px/1.6 "Microsoft YaHei",system-ui,sans-serif;min-height:100vh}
+header{display:flex;align-items:center;gap:16px;padding:16px 24px;border-bottom:1px solid var(--line);backdrop-filter:blur(8px)}
+header h1{font-size:16px;margin:0;font-weight:600;letter-spacing:.5px}
+header .sub{color:var(--dim);font-size:12px}
+header .nav{margin-left:auto;display:flex;gap:10px}
+header a{color:var(--dim);text-decoration:none;font-size:13px;padding:6px 12px;border:1px solid var(--line);border-radius:8px}
+header a:hover{color:var(--text);border-color:var(--acc)}
+.wrap{display:grid;grid-template-columns:380px 1fr;gap:20px;padding:20px 24px 60px;max-width:1600px;margin:0 auto}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+.modes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.mode{padding:10px 8px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);cursor:pointer;text-align:center;font-size:12.5px;color:var(--dim);transition:.15s}
+.mode:hover{border-color:#3d4a63;color:var(--text)}
+.mode.on{border-color:var(--acc);color:#fff;background:linear-gradient(180deg,#25365e,#1c2640);box-shadow:0 0 0 1px rgba(91,140,255,.25) inset}
+label.f{display:block;font-size:12px;color:var(--dim);margin:12px 0 6px}
+textarea,input[type=text],input[type=number],select{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:9px;padding:9px 10px;font:13px/1.55 inherit;outline:none}
+textarea{resize:vertical;min-height:88px}
+textarea:focus,input:focus,select:focus{border-color:var(--acc)}
+.row{display:flex;gap:8px;align-items:center}
+.row>*{flex:1}
+.btn{border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:9px;padding:9px 14px;cursor:pointer;font:13px inherit;transition:.15s}
+.btn:hover{border-color:#3d4a63}
+.btn.primary{background:linear-gradient(180deg,#4a7cff,#3563e0);border-color:#3563e0;color:#fff;font-weight:600}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.drop{border:1.5px dashed var(--line);border-radius:11px;padding:14px;text-align:center;color:var(--dim);font-size:12.5px;cursor:pointer;position:relative;overflow:hidden;min-height:74px;display:flex;align-items:center;justify-content:center}
+.drop:hover{border-color:var(--acc);color:var(--text)}
+.drop img{max-width:100%;max-height:120px;border-radius:8px;display:block}
+.drop.has{padding:6px}
+.hint{font-size:11.5px;color:#6a7488;margin-top:6px;line-height:1.5}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{padding:5px 10px;border:1px solid var(--line);border-radius:8px;font-size:12px;color:var(--dim);cursor:pointer}
+.chip.on{border-color:var(--acc);color:#fff;background:#22305a}
+.cams{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.refpanel{margin-top:8px;max-height:280px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--panel2)}
+.refpanel .refhead{display:flex;gap:6px;align-items:center;margin-bottom:8px;font-size:12px;color:var(--dim)}
+.refpanel .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.refpanel .it{border:1px solid var(--line);border-radius:8px;overflow:hidden;cursor:pointer;position:relative;background:#000}
+.refpanel .it img{width:100%;height:64px;object-fit:cover;display:block}
+.refpanel .it span{position:absolute;left:0;right:0;bottom:0;font-size:9.5px;color:#cfd6e4;background:rgba(8,10,16,.72);padding:2px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.refpanel .it:hover{border-color:var(--acc)}
+.cams .chip{text-align:center}
+.results{display:flex;flex-direction:column;gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+.card .hd{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--dim);margin-bottom:10px}
+.tag{padding:2px 9px;border-radius:20px;font-size:11.5px;border:1px solid var(--line)}
+.tag.run{color:var(--warn);border-color:#5c4526;background:#2a2114}
+.tag.done{color:var(--ok);border-color:#1d5c42;background:#12281f}
+.tag.fail{color:#ff7b7b;border-color:#5c2626;background:#2a1414}
+.card .meta{margin-left:auto;font-size:11.5px;color:#6a7488}
+.card .out{display:flex;gap:10px;flex-wrap:wrap}
+.card .out img,.card .out video{max-width:100%;max-height:520px;border-radius:10px;border:1px solid var(--line);background:#000}
+.empty{color:#6a7488;font-size:13px;padding:40px 0;text-align:center}
+.pill{display:inline-block;padding:2px 8px;border-radius:20px;background:#222a38;color:var(--dim);font-size:11.5px;margin-left:6px}
+#toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:#222b3d;border:1px solid var(--line);color:var(--text);padding:10px 18px;border-radius:10px;opacity:0;transition:.25s;pointer-events:none;font-size:13px;z-index:99}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+@media(max-width:1000px){.wrap{grid-template-columns:1fr}}
+</style>
+<script>(function(){try{var q=(location.search.match(/[?&]theme=([a-z]+)/)||[])[1];var t=q||localStorage.getItem('lj_theme')||'aurora';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','aurora');}})();</script>
+<link rel="stylesheet" href="/static/themes.css" />
+<link rel="stylesheet" href="/static/setup.css" />
+</head>
+<body>
+<header>
+  <div>
+    <h1>JJOS 创作台 <span class="pill" id="hw">显存 --</span><span class="pill" id="q">队列 --</span></h1>
+    <div class="sub">JJOS · 本地 AI 创作台 —— FLUX 文生图 · Kontext 改图 · 首尾帧 · 运镜 · 放大 · Wan2.2 文生视频 / 图生视频，全在本机</div>
+  </div>
+  <div class="nav">
+    <a href="/">返回首页</a>
+    <a href="javascript:void(0)" class="setup-entry-link" id="pill-setup" title="点开：环境自检与缺失清单"><span class="dot"></span>环境 <b>检测中</b></a>
+    <a href="#" id="refresh-hw">刷新状态</a>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="modes" id="modes">
+      <div class="mode on" data-m="flux">FLUX 文生图</div>
+      <div class="mode" data-m="kontext">Kontext 改图</div>
+      <div class="mode" data-m="firstlast">首尾帧</div>
+      <div class="mode" data-m="camera">运镜视频</div>
+      <div class="mode" data-m="upscale">高清放大</div>
+      <div class="mode" data-m="t2v">文生视频</div>
+      <div class="mode" data-m="i2v">图生视频</div>
+    </div>
+
+    <label class="f" id="lb-prompt">提示词</label>
+    <textarea id="prompt" placeholder="描述你想要的画面，例如：一位年轻女性站在落地窗前，午后侧逆光，浅景深，写实人像摄影"></textarea>
+    <div class="row" style="margin-top:8px">
+      <button class="btn ghost" id="btn-assist">提示词助手</button>
+      <button class="btn ghost" id="btn-clear">清空</button>
+    </div>
+    <div class="hint" id="assist-hint">提示词助教会读取你上传的图片，用本地模型写成专业提示词。</div>
+
+    <label class="f" id="lb-first">参考图 / 首帧</label>
+    <div class="drop" id="drop-first"><span>点击上传图片</span></div>
+    <div class="row" style="margin-top:6px">
+      <button class="btn ghost" id="btn-ref">从默认文件夹选图</button>
+      <span class="hint" id="ref-dir" style="margin-top:0;align-self:center"></span>
+    </div>
+    <div class="refpanel" id="refpanel" style="display:none"></div>
+
+    <div id="wrap-end" style="display:none">
+      <label class="f">尾帧（结束画面）</label>
+      <div class="drop" id="drop-end"><span>点击上传尾帧</span></div>
+    </div>
+
+    <div id="wrap-cam" style="display:none">
+      <label class="f">运镜方式</label>
+      <div class="cams" id="cams"></div>
+    </div>
+
+    <div id="wrap-model">
+<label class="f" id="lb-model">模型<a href="#" id="btn-relmodels" style="float:right;color:var(--acc);font-size:12px;text-decoration:none">刷新</a></label>
+<div id="model-box"></div>
+</div>
+<label class="f">画面尺寸</label>
+    <div class="chips" id="sizes">
+      <div class="chip on" data-w="1024" data-h="1024">1:1</div>
+      <div class="chip" data-w="832" data-h="1216">3:4</div>
+      <div class="chip" data-w="1216" data-h="832">4:3</div>
+      <div class="chip" data-w="480" data-h="832">9:16</div>
+      <div class="chip" data-w="832" data-h="480">16:9</div>
+    </div>
+
+    <div id="wrap-style">
+      <label class="f">画面风格（写进提示词）</label>
+      <select id="style">
+        <option value="photo">写实照片</option>
+        <option value="cinematic">电影感</option>
+        <option value="portrait">人像特写</option>
+        <option value="illustration">插画</option>
+        <option value="product">产品图</option>
+      </select>
+    </div>
+
+    <div id="wrap-guid" style="display:none">
+      <label class="f">引导强度（FLUX guidance）</label>
+      <input type="number" id="guidance" value="3.5" step="0.5" min="1" max="10" />
+    </div>
+
+    <div class="row" style="margin-top:12px">
+      <div><label class="f">步数</label><input type="number" id="steps" value="20" min="1" max="80" /></div>
+      <div><label class="f">种子</label><input type="text" id="seed" placeholder="随机" /></div>
+    </div>
+
+    <div id="wrap-video" style="display:none">
+      <div class="row">
+        <div><label class="f">帧数</label><input type="number" id="length" value="49" min="17" max="121" step="4" /></div>
+        <div><label class="f">帧率</label><input type="number" id="fps" value="16" min="8" max="30" /></div>
+        <div id="wrap-cfg" style="display:none"><label class="f">CFG</label><input type="number" id="cfg" value="1.0" step="0.5" min="1" max="10" /></div>
+      </div>
+    </div>
+
+    <label class="f">反向提示词</label>
+    <textarea id="negative" style="min-height:56px">低质量，模糊，变形，多余手指，水印，文字</textarea>
+
+    <button class="btn primary" id="btn-run" style="width:100%;margin-top:16px;padding:12px">生成</button>
+    <div class="hint" id="run-hint"></div>
+  </div>
+
+  <div>
+    <div class="panel" style="margin-bottom:14px;display:flex;align-items:center;gap:10px">
+      <strong style="font-size:13.5px">本次生成</strong>
+      <span class="pill" id="job-count">0</span>
+      <button class="btn ghost" id="btn-gallery" style="margin-left:auto">打开作品库</button>
+    </div>
+    <div class="results" id="results"><div class="empty">还没有任务，左侧选个模式开始。</div></div>
+    <div id="gallery" style="display:none"></div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<input type="file" id="f-first" accept="image/*" hidden />
+<input type="file" id="f-end" accept="image/*" hidden />
+
+<!-- 环境自检向导：与首页共用 setup.js / setup.css -->
+<div class="setup-mask" id="setup-mask">
+  <div class="setup-panel">
+    <div class="setup-head">
+      <h2>环境自检</h2>
+      <span class="setup-verdict" id="setup-verdict"><span class="vdot"></span>未检测</span>
+      <span class="setup-sub" id="setup-sub"></span>
+      <div class="grow"></div>
+      <button class="setup-close" id="setup-close" title="关闭（Esc）">×</button>
+    </div>
+    <div class="setup-tabs">
+      <button class="setup-tab active" id="tab-check">体检结果<span class="badge" id="tab-check-badge">-</span></button>
+      <button class="setup-tab" id="tab-models">模型权重<span class="badge" id="tab-models-badge">-</span></button>
+      <button class="setup-tab" id="tab-features">现在能用什么</button>
+    </div>
+    <div class="setup-body">
+      <section class="active" id="setup-summary"></section>
+      <section id="setup-models"></section>
+      <section id="setup-features"></section>
+    </div>
+    <div class="setup-foot">
+      <label><input type="checkbox" id="setup-noshow"> 启动时不再自动弹出</label>
+      <div class="grow"></div>
+      <button class="btn ghost" id="setup-guide">复制安装指引</button>
+      <button class="btn" id="setup-refresh">重新检测</button>
+      <button class="btn primary" id="setup-done">开始使用</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/studio.js"></script>
+<script src="/static/studio-pro.js"></script>
+<script src="/static/studio-story.js"></script>
+<script src="/static/studio-extra.js"></script>
+<script src="/static/setup.js"></script>
+<script src="/static/theme.js"></script>
+</body>
+</html>

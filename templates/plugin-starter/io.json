@@ -1,0 +1,83 @@
+{
+  "inputs": [
+    {
+      "key": "prompt",
+      "type": "textarea",
+      "label": "提示词",
+      "required": true,
+      "default": "",
+      "group": "basic",
+      "order": 1
+    },
+    {
+      "key": "negative",
+      "type": "textarea",
+      "label": "负向提示词",
+      "default": "",
+      "group": "basic",
+      "order": 2
+    },
+    {
+      "key": "ckpt",
+      "type": "select",
+      "label": "底模",
+      "options": ["填一个 ComfyUI 里真实存在的权重文件名.safetensors"],
+      "default": "填一个 ComfyUI 里真实存在的权重文件名.safetensors",
+      "source": "comfy:ckpt",
+      "group": "basic",
+      "order": 3
+    },
+    {
+      "key": "width",
+      "type": "number",
+      "label": "宽",
+      "min": 256,
+      "max": 2048,
+      "step": 64,
+      "default": 1024,
+      "group": "basic",
+      "order": 4
+    },
+    {
+      "key": "height",
+      "type": "number",
+      "label": "高",
+      "min": 256,
+      "max": 2048,
+      "step": 64,
+      "default": 1024,
+      "group": "basic",
+      "order": 5
+    },
+    {
+      "key": "steps",
+      "type": "number",
+      "label": "步数",
+      "min": 1,
+      "max": 80,
+      "step": 1,
+      "default": 28,
+      "tier_scale": true,
+      "help": "tier_scale=true 时随画质档位缩放（draft 0.5 / balanced 1.0 / final 1.3）",
+      "group": "advanced",
+      "order": 6
+    },
+    {
+      "key": "seed",
+      "type": "seed",
+      "label": "种子",
+      "default": -1,
+      "help": "-1 表示每次随机",
+      "group": "advanced",
+      "order": 7
+    }
+  ],
+  "outputs": [
+    {"key": "image", "type": "image", "label": "生成图"}
+  ],
+  "tiers": ["draft", "balanced", "final"],
+  "groups": [
+    {"key": "basic", "label": "基础"},
+    {"key": "advanced", "label": "高级"}
+  ]
+}

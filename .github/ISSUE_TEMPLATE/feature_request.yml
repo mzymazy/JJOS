@@ -1,0 +1,59 @@
+name: 功能建议
+description: 想要某个能力、某个交互，或觉得现有流程别扭
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        提之前先确认两件事：能不能用一个插件解决（`plugins/` 放三个 json 就够，不需要改 Python）；
+        以及这件事要不要联网——要联网的功能一律默认关闭且必须显式开关。
+
+  - type: textarea
+    id: need
+    attributes:
+      label: 你想完成什么
+      description: 描述目标，不用替我们设计实现
+      placeholder: 我想一次给同一段提示词出 4 张图，现在只能一张一张点。
+    validations:
+      required: true
+
+  - type: textarea
+    id: now
+    attributes:
+      label: 现在怎么绕
+      description: 目前的临时办法，以及它哪里难受
+    validations:
+      required: false
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: 属于哪一类
+      options:
+        - 新出图 / 出片能力（多半可以做成插件）
+        - 现有界面交互
+        - 批量 / 队列 / 性能
+        - 环境检测与安装引导
+        - 插件机制本身
+        - 文档
+    validations:
+      required: true
+
+  - type: dropdown
+    id: net
+    attributes:
+      label: 是否需要联网
+      options:
+        - 不需要，纯本机
+        - 需要，且可以作为可选功能默认关闭
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 参考与补充
+      description: 截图、同类工具的做法、相关 ComfyUI 节点或工作流
+    validations:
+      required: false

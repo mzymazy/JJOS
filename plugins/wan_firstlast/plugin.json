@@ -1,0 +1,40 @@
+{
+  "id": "wan_firstlast",
+  "name": "Wan2.2 首尾帧视频",
+  "version": "0.1.0",
+  "api_version": 1,
+  "kind": "video",
+  "author": "JJOS",
+  "license": "MIT",
+  "description": "给首帧和尾帧，让画面从 A 过渡到 B。与 /api/wan/firstlast 等价的工作流镜像。",
+  "tags": [
+    "builtin-mirror",
+    "video"
+  ],
+  "requires": {
+    "engine": "comfyui",
+    "min_app_version": "0.2.0",
+    "custom_nodes": [],
+    "models": [
+      {
+        "file": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+        "min_size_mb": 100
+      },
+      {
+        "file": "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+        "min_size_mb": 100
+      },
+      {
+        "file": "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
+        "min_size_mb": 100
+      },
+      {
+        "file": "wan_2.1_vae.safetensors",
+        "min_size_mb": 100
+      }
+    ],
+    "vram_gb": 12,
+    "inputs_dir": []
+  },
+  "builtin": "wf_wan_firstlast"
+}

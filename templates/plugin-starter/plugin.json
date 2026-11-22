@@ -1,0 +1,26 @@
+{
+  "id": "my_plugin",
+  "name": "我的插件",
+  "version": "0.1.0",
+  "api_version": 1,
+  "kind": "image",
+  "author": "你的名字",
+  "license": "MIT",
+  "description": "一句话说清这个插件做什么、适合什么场景。",
+  "tags": [
+    "image"
+  ],
+  "requires": {
+    "engine": "comfyui",
+    "custom_nodes": [],
+    "models": [
+      {
+        "file": "你的权重文件名.safetensors",
+        "min_size_mb": 6000
+      }
+    ],
+    "vram_gb": 8,
+    "inputs_dir": []
+  },
+  "routes": []
+}

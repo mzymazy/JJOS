@@ -1,0 +1,176 @@
+{
+  "inputs": [
+    {
+      "key": "height",
+      "type": "number",
+      "label": "高",
+      "group": "basic",
+      "min": 256,
+      "max": 2048,
+      "step": 64,
+      "default": 480,
+      "order": 1
+    },
+    {
+      "key": "negative",
+      "type": "textarea",
+      "label": "负向提示词",
+      "group": "basic",
+      "placeholder": "不希望出现的内容",
+      "help": "留空则用内置默认负向词",
+      "default": "色调艳丽，过曝，静态，细节模糊不清，字幕，画面整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走",
+      "order": 2
+    },
+    {
+      "key": "prompt",
+      "type": "textarea",
+      "label": "正向提示词",
+      "group": "basic",
+      "placeholder": "描述画面主体、动作、镜头与风格",
+      "required": true,
+      "default": "一只橘猫坐在窗台上",
+      "order": 3
+    },
+    {
+      "key": "unet",
+      "type": "select",
+      "label": "主模型",
+      "group": "basic",
+      "options": [
+        "wan2.2_ti2v_5B_fp16.safetensors"
+      ],
+      "default": "wan2.2_ti2v_5B_fp16.safetensors",
+      "order": 4
+    },
+    {
+      "key": "width",
+      "type": "number",
+      "label": "宽",
+      "group": "basic",
+      "min": 256,
+      "max": 2048,
+      "step": 64,
+      "default": 832,
+      "order": 5
+    },
+    {
+      "key": "cfg",
+      "type": "slider",
+      "label": "CFG",
+      "group": "advanced",
+      "min": 1,
+      "max": 15,
+      "step": 0.1,
+      "default": 5.0,
+      "order": 6
+    },
+    {
+      "key": "fps",
+      "type": "number",
+      "label": "帧率",
+      "group": "advanced",
+      "min": 8,
+      "max": 30,
+      "step": 1,
+      "default": 16.0,
+      "order": 7
+    },
+    {
+      "key": "length",
+      "type": "number",
+      "label": "帧数",
+      "group": "advanced",
+      "min": 8,
+      "max": 241,
+      "step": 1,
+      "default": 49,
+      "order": 8
+    },
+    {
+      "key": "prefix",
+      "type": "text",
+      "label": "文件名前缀",
+      "group": "advanced",
+      "default": "localjimeng/t2v",
+      "order": 9
+    },
+    {
+      "key": "sampler",
+      "type": "select",
+      "label": "采样器",
+      "group": "advanced",
+      "options": [
+        "euler",
+        "euler_ancestral",
+        "dpmpp_2m",
+        "dpmpp_2m_sde",
+        "dpm_2",
+        "ddim",
+        "uni_pc",
+        "res_multistep"
+      ],
+      "default": "uni_pc",
+      "source": "comfy:samplers",
+      "order": 10
+    },
+    {
+      "key": "scheduler",
+      "type": "select",
+      "label": "调度器",
+      "group": "advanced",
+      "options": [
+        "simple",
+        "normal",
+        "karras",
+        "exponential",
+        "sgm_uniform",
+        "beta",
+        "ddim_uniform"
+      ],
+      "default": "simple",
+      "source": "comfy:schedulers",
+      "order": 11
+    },
+    {
+      "key": "seed",
+      "type": "seed",
+      "label": "种子",
+      "group": "advanced",
+      "default": -1,
+      "order": 12
+    },
+    {
+      "key": "steps",
+      "type": "number",
+      "label": "步数",
+      "group": "advanced",
+      "min": 1,
+      "max": 80,
+      "step": 1,
+      "default": 30,
+      "order": 13
+    }
+  ],
+  "outputs": [
+    {
+      "key": "video",
+      "type": "video",
+      "label": "Wan2.2 文生视频"
+    }
+  ],
+  "tiers": [
+    "draft",
+    "balanced",
+    "final"
+  ],
+  "groups": [
+    {
+      "key": "basic",
+      "label": "基础"
+    },
+    {
+      "key": "advanced",
+      "label": "高级"
+    }
+  ]
+}

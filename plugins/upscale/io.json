@@ -1,0 +1,54 @@
+{
+  "inputs": [
+    {
+      "key": "image",
+      "type": "image",
+      "label": "输入图",
+      "group": "basic",
+      "required": true,
+      "default": "",
+      "order": 1
+    },
+    {
+      "key": "model",
+      "type": "select",
+      "label": "放大模型",
+      "group": "basic",
+      "options": [
+        "RealESRGAN_x4plus.pth"
+      ],
+      "default": "RealESRGAN_x4plus.pth",
+      "order": 2
+    },
+    {
+      "key": "prefix",
+      "type": "text",
+      "label": "文件名前缀",
+      "group": "advanced",
+      "default": "localjimeng/upscale",
+      "order": 3
+    }
+  ],
+  "outputs": [
+    {
+      "key": "image",
+      "type": "image",
+      "label": "图像放大"
+    }
+  ],
+  "tiers": [
+    "draft",
+    "balanced",
+    "final"
+  ],
+  "groups": [
+    {
+      "key": "basic",
+      "label": "基础"
+    },
+    {
+      "key": "advanced",
+      "label": "高级"
+    }
+  ]
+}

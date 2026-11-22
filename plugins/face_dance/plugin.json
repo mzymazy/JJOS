@@ -1,0 +1,30 @@
+{
+  "id": "face_dance",
+  "name": "换脸跳舞",
+  "version": "0.1.0",
+  "api_version": 1,
+  "kind": "video",
+  "author": "JJOS",
+  "license": "MIT",
+  "description": "一张人物参考图 + 一段驱动视频，把参考脸迁移到驱动动作上，输出跳舞视频。基于 Wan2.2-Animate-14B，姿态与人脸由 WanAnimatePreprocess 抽取。",
+  "tags": ["animate", "video", "face-swap", "wan2.2"],
+  "requires": {
+    "engine": "comfyui",
+    "min_app_version": "0.2.0",
+    "custom_nodes": [
+      "ComfyUI-WanVideoWrapper",
+      "ComfyUI-WanAnimatePreprocess",
+      "ComfyUI-VideoHelperSuite"
+    ],
+    "models": [
+      { "file": "Wan2_2-Animate-14B_fp8_scaled_e4m3fn_KJ_v2.safetensors", "min_size_mb": 1000 },
+      { "file": "wan_2.1_vae.safetensors", "min_size_mb": 100 },
+      { "file": "umt5_xxl_fp8_e4m3fn_scaled.safetensors", "min_size_mb": 1000 },
+      { "file": "clip_vision_h.safetensors", "min_size_mb": 100 },
+      { "file": "vitpose_h_wholebody_model.onnx", "min_size_mb": 100 },
+      { "file": "yolov10m.onnx", "min_size_mb": 10 }
+    ],
+    "vram_gb": 16,
+    "inputs_dir": []
+  }
+}

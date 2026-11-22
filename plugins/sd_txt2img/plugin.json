@@ -1,0 +1,23 @@
+{
+  "id": "sd_txt2img",
+  "name": "SDXL 文生图（示范插件）",
+  "version": "0.1.0",
+  "api_version": 1,
+  "kind": "image",
+  "author": "JJOS",
+  "license": "MIT",
+  "description": "Checkpoint + KSampler 经典文生图。与旧 /api/txt2img（server.py 的 wf_txt2img）等价，用于验证「插件模板渲染 == 代码拼装」——tests/test_plugins.py 有逐字段相等的断言。",
+  "tags": ["image", "checkpoint", "demo"],
+  "routes": [
+    {"path": "/api/txt2img", "translate": "txt2img"}
+  ],
+  "requires": {
+    "engine": "comfyui",
+    "custom_nodes": [],
+    "models": [
+      {"file": "RealVisXL_V4.0.safetensors", "min_size_mb": 6000}
+    ],
+    "vram_gb": 7,
+    "inputs_dir": []
+  }
+}

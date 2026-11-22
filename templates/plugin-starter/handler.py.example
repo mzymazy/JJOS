@@ -1,0 +1,36 @@
+# -*- coding: utf-8 -*-
+"""代码钩子示例（可选）
+
+**这个文件名是 handler.py.example，所以不会生效。** 只有改名成 handler.py 才会被加载。
+先问自己一句：能不能只用 workflow.json 里的 {{占位符}} 搞定？能就别用这个文件——
+每多一个执行面，就多一类安全问题。
+
+适用场景（模板表达不了的）：
+  - steps / cfg 要跟着 tier 或素材数量联动
+  - 某些节点要根据输入决定挂不挂
+  - 需要读同目录下的附加 json 配置
+
+硬约束（装载期静态扫描，撞了就直接 degraded，连跑的机会都没有）：
+  - 不许出现 import / from / open( / eval / exec / compile / __xxx__ / subprocess /
+    socket / requests / urllib / os. / sys. / globals() / vars()
+  - 必须定义同步的 build(ctx)，源码 ≤ 64KB
+执行期：命名空间里没有 open、没有 __import__、没有 print、没有 input。
+返回值：ComfyUI API 格式工作流，节点 ≤ 200、≤ 2MB、不得残留 {{占位符}}。
+"""
+
+
+def build(ctx):
+    wf = ctx.workflow  # 声明式渲染后的工作流，dict，可以直接改
+
+    # ctx 里有：id / kind / tier / values / workflow / warnings / refs
+    steps = {"draft": 12, "balanced": 20, "quality": 30}.get(ctx.tier, 20)
+    steps += 2 * min(len(ctx.refs), 4)  # 参考图越多，步子迈大一点
+
+    for node in wf.values():
+        if node.get("class_type") == "KSampler":
+            node["inputs"]["steps"] = steps
+
+    if ctx.values.get("prompt"):
+        ctx.warnings.append("钩子已按 tier=%s 调整 steps=%d" % (ctx.tier, steps))
+
+    return wf

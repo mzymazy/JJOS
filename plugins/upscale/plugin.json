@@ -1,0 +1,23 @@
+{
+  "id": "upscale",
+  "name": "图像放大",
+  "version": "0.1.0",
+  "api_version": 1,
+  "kind": "image",
+  "author": "JJOS",
+  "license": "MIT",
+  "description": "用放大模型把图放大。与 /api/upscale 等价的工作流镜像。",
+  "tags": [
+    "builtin-mirror",
+    "image"
+  ],
+  "requires": {
+    "engine": "comfyui",
+    "min_app_version": "0.2.0",
+    "custom_nodes": [],
+    "models": [],
+    "vram_gb": 7,
+    "inputs_dir": []
+  },
+  "builtin": "wf_upscale"
+}

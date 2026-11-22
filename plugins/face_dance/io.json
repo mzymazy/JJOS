@@ -1,0 +1,236 @@
+{
+  "inputs": [
+    {
+      "key": "ref_image",
+      "type": "image",
+      "label": "人物参考图",
+      "group": "basic",
+      "required": true,
+      "default": "",
+      "help": "要迁移的那张脸，填 ComfyUI input 目录下的素材名（如 ref_face.png）。正面清晰、单人、脸部占比大效果最好。",
+      "order": 1
+    },
+    {
+      "key": "video",
+      "type": "video",
+      "label": "驱动视频",
+      "group": "basic",
+      "required": true,
+      "default": "",
+      "help": "提供动作的跳舞视频，填 ComfyUI input 目录下的文件名（如 dance.mp4）。人物尽量单人、全身入画。",
+      "order": 2
+    },
+    {
+      "key": "prompt",
+      "type": "textarea",
+      "label": "正向提示词",
+      "group": "basic",
+      "placeholder": "描述人物、服装、场景与画质",
+      "required": true,
+      "default": "a person dancing, full body, natural motion, clean background, high quality, sharp details",
+      "order": 3
+    },
+    {
+      "key": "negative",
+      "type": "textarea",
+      "label": "负向提示词",
+      "group": "basic",
+      "placeholder": "不希望出现的内容",
+      "default": "blurry, low quality, distorted face, extra limbs, deformed hands, flickering, jitter, watermark, text",
+      "order": 4
+    },
+    {
+      "key": "unet",
+      "type": "select",
+      "label": "动作模型",
+      "group": "model",
+      "options": ["Wan2_2-Animate-14B_fp8_scaled_e4m3fn_KJ_v2.safetensors"],
+      "default": "Wan2_2-Animate-14B_fp8_scaled_e4m3fn_KJ_v2.safetensors",
+      "order": 5
+    },
+    {
+      "key": "vae",
+      "type": "select",
+      "label": "VAE",
+      "group": "model",
+      "options": ["wan_2.1_vae.safetensors", "wan2.2_vae.safetensors"],
+      "default": "wan_2.1_vae.safetensors",
+      "order": 6
+    },
+    {
+      "key": "t5",
+      "type": "select",
+      "label": "文本编码器",
+      "group": "model",
+      "options": ["umt5_xxl_fp8_e4m3fn_scaled.safetensors"],
+      "default": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "order": 7
+    },
+    {
+      "key": "clip_vision",
+      "type": "select",
+      "label": "视觉编码器",
+      "group": "model",
+      "options": ["clip_vision_h.safetensors"],
+      "default": "clip_vision_h.safetensors",
+      "order": 8
+    },
+    {
+      "key": "vitpose",
+      "type": "select",
+      "label": "姿态检测模型",
+      "group": "model",
+      "options": ["vitpose_h_wholebody_model.onnx"],
+      "default": "vitpose_h_wholebody_model.onnx",
+      "order": 9
+    },
+    {
+      "key": "yolo",
+      "type": "select",
+      "label": "人体检测模型",
+      "group": "model",
+      "options": ["yolov10m.onnx"],
+      "default": "yolov10m.onnx",
+      "order": 10
+    },
+    {
+      "key": "width",
+      "type": "number",
+      "label": "宽",
+      "group": "shape",
+      "min": 256,
+      "max": 1280,
+      "step": 8,
+      "default": 480,
+      "help": "8 的倍数；竖屏人像用 480x832，横屏用 832x480。",
+      "order": 11
+    },
+    {
+      "key": "height",
+      "type": "number",
+      "label": "高",
+      "group": "shape",
+      "min": 256,
+      "max": 1280,
+      "step": 8,
+      "default": 832,
+      "order": 12
+    },
+    {
+      "key": "length",
+      "type": "number",
+      "label": "帧数",
+      "group": "shape",
+      "min": 4,
+      "max": 161,
+      "step": 1,
+      "default": 49,
+      "help": "同时作为驱动视频的截取帧数；建议 4n+1（如 25/49/81）。帧数越多越吃显存。",
+      "order": 13
+    },
+    {
+      "key": "fps",
+      "type": "number",
+      "label": "帧率",
+      "group": "shape",
+      "min": 1,
+      "max": 60,
+      "step": 1,
+      "default": 16,
+      "help": "驱动视频按该帧率重采样，输出视频同样是该帧率。",
+      "order": 14
+    },
+    {
+      "key": "steps",
+      "type": "slider",
+      "label": "采样步数",
+      "group": "advanced",
+      "min": 1,
+      "max": 60,
+      "step": 1,
+      "default": 20,
+      "order": 15
+    },
+    {
+      "key": "cfg",
+      "type": "slider",
+      "label": "CFG",
+      "group": "advanced",
+      "min": 1,
+      "max": 15,
+      "step": 0.1,
+      "default": 6,
+      "order": 16
+    },
+    {
+      "key": "shift",
+      "type": "slider",
+      "label": "Shift",
+      "group": "advanced",
+      "min": 0,
+      "max": 30,
+      "step": 0.1,
+      "default": 5,
+      "order": 17
+    },
+    {
+      "key": "scheduler",
+      "type": "select",
+      "label": "采样调度",
+      "group": "advanced",
+      "options": ["unipc", "unipc/beta", "dpm++", "dpm++_sde", "euler", "euler/beta", "res_multistep", "deis", "lcm"],
+      "default": "unipc",
+      "order": 18
+    },
+    {
+      "key": "seed",
+      "type": "seed",
+      "label": "随机种子",
+      "group": "advanced",
+      "default": -1,
+      "help": "-1 表示每次随机。",
+      "order": 19
+    },
+    {
+      "key": "pose_strength",
+      "type": "slider",
+      "label": "动作强度",
+      "group": "advanced",
+      "min": 0,
+      "max": 2,
+      "step": 0.05,
+      "default": 1,
+      "help": "跟动作骨架的贴合度，越高越严格照搬驱动动作。",
+      "order": 20
+    },
+    {
+      "key": "face_strength",
+      "type": "slider",
+      "label": "换脸强度",
+      "group": "advanced",
+      "min": 0,
+      "max": 2,
+      "step": 0.05,
+      "default": 1,
+      "help": "跟参考脸的相似度，越高越像参考图，太高可能僵硬。",
+      "order": 21
+    },
+    {
+      "key": "prefix",
+      "type": "text",
+      "label": "输出前缀",
+      "group": "advanced",
+      "default": "localjimeng/face_dance",
+      "order": 22
+    }
+  ],
+  "outputs": [
+    { "key": "out_video", "type": "video", "label": "成片" }
+  ],
+  "groups": [
+    { "key": "basic", "label": "素材与提示词" },
+    { "key": "model", "label": "模型选择" },
+    { "key": "shape", "label": "尺寸与时长" },
+    { "key": "advanced", "label": "高级参数" }
+  ]
+}
