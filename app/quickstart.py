@@ -45,6 +45,14 @@ STATE = {
     "total": 0, "done": [], "failed": [], "skipped": [],
     "started_at": None, "finished_at": None, "stop": False,
 }
+# 权重下载单独一个状态机：几十 GB 的进度不能和"配工具"混在一起，
+# 用户可以先配好工具、稍后再下模型，两者互不阻塞。
+MODEL_STATE = {
+    "running": False, "stage": "idle", "msg": "", "file": "",
+    "index": 0, "total": 0, "pct": 0, "speed": 0, "done": [], "failed": [],
+    "started_at": None, "finished_at": None, "stop": False,
+}
+_MODEL_LOCK = threading.Lock()
 _LOCK = threading.Lock()
 _COMFY_PROC = None
 
@@ -216,6 +224,30 @@ def tier_for(vram_gb):
             "note": "没读到显卡信息也能装；开始出片前会再检测一次"}
 
 
+def _installed_model_names():
+    """已装权重名列表。优先问在线的 ComfyUI；离线时退化为扫本地目录文件名，
+    保证"下过的不重复下载"在没起服务时也成立。"""
+    try:
+        from .routes.setup import _model_report
+        rp = _model_report()
+        if rp.get("installed"):
+            return rp["installed"]
+    except Exception:
+        pass
+    # 离线兜底：直接扫 ComfyUI 的权重目录，认文件名不认服务
+    comfy = find_comfy_dir()
+    out = []
+    if comfy:
+        for sub in ("unet", "diffusion_models", "checkpoints", "vae",
+                    "text_encoders", "clip_vision", "upscale_models"):
+            d = os.path.join(comfy, "models", sub)
+            if os.path.isdir(d):
+                for f in os.listdir(d):
+                    if f.endswith((".safetensors", ".pth", ".gguf")):
+                        out.append({"file": f})
+    return out
+
+
 def scan():
     """一次全面探测。前端 /api/quick/scan 的唯一数据源，全程只读。"""
     gpu = _gpu()
@@ -230,6 +262,11 @@ def scan():
         disk_free_gb = 0
     workflows = _workflow_files()
     wf_installed = _workflows_installed()
+    # 运行环境只读探测：torch 在不在、CUDA 能不能用、该装哪个 wheel。
+    # 子进程探测，绝不 import torch 到主进程（保持 JJOS 零依赖）。
+    from . import runtime as RT
+    torch = RT.detect_torch()
+    wheel = RT.choose_channel(gpu["name"], gpu["vendor"], RT.driver_version())
     return {
         "machine": {
             "os": "%s %s" % (platform.system(), platform.release()),
@@ -256,6 +293,15 @@ def scan():
         "workflows": {"bundled": workflows, "count": len(workflows),
                       "installed": wf_installed},
         "config": {"exists": os.path.isfile(CONFIG_PATH), "path": CONFIG_PATH},
+        # 已装权重名（只读探测，离线时为空不报错），供套餐判断"已下过的跳过"
+        "weights": {"installed": [{"file": m["file"]} for m in _installed_model_names()]},
+        "runtime": {
+            "python": torch.get("python", ""), "torch": torch.get("torch", ""),
+            "cuda": torch.get("cuda", ""), "cuda_ok": bool(torch.get("ok")),
+            "devices": torch.get("devices", 0), "error": torch.get("error", ""),
+            "channel": wheel["channel"], "index_url": wheel["index_url"],
+            "wheel_ok": wheel["ok"], "wheel_reason": wheel["reason"],
+        },
         "checked_at": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
 
@@ -268,6 +314,19 @@ def build_plan(report=None):
     def add(aid, title, detail, kind, need):
         plan.append({"id": aid, "title": title, "detail": detail,
                      "kind": kind, "need": need})
+
+    rt = rp.get("runtime", {}) or {}
+    if rt.get("cuda_ok"):
+        add("runtime", "显卡运行环境",
+            "已就绪（torch %s / CUDA %s）" % (rt.get("torch", "?"), rt.get("cuda", "?")),
+            "ok", False)
+    elif rt.get("wheel_ok") and rt.get("channel"):
+        add("runtime", "显卡运行环境",
+            "自动安装 torch %s（约 2-3GB）— %s" % (rt["channel"], rt.get("wheel_reason", "")),
+            "auto", True)
+    else:
+        add("runtime", "显卡运行环境", rt.get("wheel_reason", "无法自动安装"),
+            "manual", True)
 
     if rp["comfy"]["found"]:
         add("comfy", "推理引擎", "已找到 %s" % rp["comfy"]["dir"], "ok", False)
@@ -308,9 +367,20 @@ def build_plan(report=None):
     else:
         add("ffmpeg", "视频合成组件", "已就绪", "ok", False)
 
-    add("weights", "出片模型",
-        "模型共几十 GB，程序列出「下载哪个、放哪里、多大」清单，不偷偷下载",
-        "manual", True)
+    from . import models as M
+    weights = rp.get("weights") or {}
+    installed_names = [m["file"] for m in weights.get("installed", [])]
+    tier_id = (rp.get("tier") or {}).get("id", "pro")
+    wp = M.plan(tier_id, rp["comfy"]["dir"] or
+                os.path.abspath(os.path.join(BASE_DIR, os.pardir, "ComfyUI")),
+                installed_names)
+    if wp["need_bytes"] == 0:
+        add("weights", "出片模型", "这套配置要用的模型已齐全", "ok", False)
+    else:
+        add("weights", "出片模型",
+            "一键下载 %d 个模型（约 %.1fGB，自动断点续传，已下过的不重复）" %
+            (len([x for x in wp["items"] if not x["installed"]]), wp["need_gb"]),
+            "auto", True)
 
     if not rp["comfy"]["online"]:
         add("start", "启动引擎", "装完后自动启动推理引擎", "auto", True)
@@ -413,6 +483,109 @@ def _install_workflows():
     return True, "导入 %d 套，保留原有 %d 套" % (copied, skipped)
 
 
+def _ensure_runtime():
+    """安装 torch/CUDA 运行环境 + ComfyUI 自带依赖。"""
+    from . import runtime as RT
+    rp = scan()
+    comfy_dir = rp["comfy"]["dir"] or os.path.abspath(
+        os.path.join(BASE_DIR, os.pardir, "ComfyUI"))
+    gpu = rp["machine"]["gpu"]
+    cmds = RT.pip_commands(comfy_dir, gpu["name"], gpu["vendor"],
+                           RT.driver_version(), torch_ok=rp["runtime"]["cuda_ok"])
+    if not cmds:
+        return True, "运行环境已就绪"
+    ok, bad = [], []
+    for item in cmds:
+        if _stopped():
+            break
+        if item.get("manual") or not item.get("argv"):
+            bad.append(item["note"])
+            continue
+        _set("runtime", item["title"], msg=item.get("note", ""))
+        good, msg = RT.run_pip(item["argv"],
+                               on_line=lambda line: _set("runtime", item["title"], msg=line[-140:]),
+                               stopped=_stopped)
+        (ok if good else bad).append("%s：%s" % (item["title"], msg))
+    if bad:
+        return False, "；".join(bad)
+    return True, "；".join(ok) or "运行环境已就绪"
+
+
+def _model_stopped():
+    with _MODEL_LOCK:
+        return MODEL_STATE.get("stop")
+
+
+def _mset(stage, msg="", **kw):
+    with _MODEL_LOCK:
+        MODEL_STATE["stage"] = stage
+        MODEL_STATE["msg"] = msg
+        MODEL_STATE.update(kw)
+
+
+def _download_models(tier_id=None, include_extra=False):
+    """按档位下载权重。每个文件一个 Downloader，进度汇总到 MODEL_STATE。"""
+    from . import models as M
+    from . import downloader as D
+    rp = scan()
+    comfy_dir = rp["comfy"]["dir"] or os.path.abspath(
+        os.path.join(BASE_DIR, os.pardir, "ComfyUI"))
+    wp = M.plan(tier_id or rp["tier"]["id"], comfy_dir,
+                [m["file"] for m in rp["weights"]["installed"]], include_extra)
+    todo = [x for x in wp["items"] if not x["installed"] and x.get("path")]
+    with _MODEL_LOCK:
+        MODEL_STATE.update({
+            "running": True, "stage": "start", "msg": "准备下载", "file": "",
+            "index": 0, "total": len(todo), "pct": 0, "speed": 0,
+            "done": [], "failed": [], "stop": False,
+            "started_at": time.strftime("%Y-%m-%d %H:%M:%S"), "finished_at": None,
+        })
+    ok, bad = [], []
+    for i, item in enumerate(todo, 1):
+        if _model_stopped() or _stopped():
+            _mset("stopped", "已按你的要求停止，下次可接着下")
+            break
+        _mset("downloading", "正在下载（%d/%d）" % (i, len(todo)),
+              file=item["file"], index=i)
+        dl = D.Downloader(item["url"], item["path"], expected_size=item["size"],
+                          stop=lambda: _model_stopped() or _stopped())
+        good, msg = dl.run()
+        if good:
+            ok.append(item["file"])
+        else:
+            bad.append({"file": item["file"], "msg": msg})
+        with _MODEL_LOCK:
+            MODEL_STATE["done"] = list(ok)
+            MODEL_STATE["failed"] = list(bad)
+            MODEL_STATE["pct"] = round(i * 100.0 / len(todo), 1) if todo else 100
+    if not _model_stopped():
+        _mset("done", "模型下载完成", pct=100, file="")
+    with _MODEL_LOCK:
+        MODEL_STATE.update({"running": False,
+                            "finished_at": time.strftime("%Y-%m-%d %H:%M:%S")})
+    return {"ok": not bad, "failed": bad}
+
+
+def start_download_models(tier_id=None, include_extra=False):
+    if MODEL_STATE.get("running"):
+        return False, "已有模型下载在跑"
+    t = threading.Thread(target=_download_models, args=(tier_id, include_extra),
+                         daemon=True, name="jjos-models")
+    t.start()
+    return True, "已开始"
+
+
+def stop_download_models():
+    with _MODEL_LOCK:
+        MODEL_STATE["stop"] = True
+    return {"stopping": True}
+
+
+def model_status():
+    with _MODEL_LOCK:
+        return dict(MODEL_STATE)
+
+
 def _start_comfy():
     """后台拉起 ComfyUI；已在线则不重复启动。"""
     global _COMFY_PROC
@@ -434,10 +607,12 @@ def _start_comfy():
 
 
 _ACTIONS = {
+    "runtime": lambda: _ensure_runtime(),
     "comfy": lambda: _ensure_comfy(),
     "config": lambda: _ensure_config(),
     "nodes": lambda: _install_nodes(scan()["nodes"]["required"]),
     "workflows": lambda: _install_workflows(),
+    "weights": lambda: _download_models(),
     "start": lambda: _start_comfy(),
 }
 

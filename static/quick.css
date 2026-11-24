@@ -20,11 +20,17 @@ a{color:var(--accent);text-decoration:none}
   padding:16px 18px;display:flex;align-items:center;justify-content:space-between;gap:16px}
 .machine{font-weight:500}
 .tier{font-size:12px;color:var(--muted);margin-top:2px}
-.setup-right{min-width:180px;text-align:right}
+.runtime{font-size:12px;margin-top:4px;color:var(--muted)}
+.runtime.ok{color:var(--accent)}
+.runtime.warn{color:#b45309}
+.setup-right{min-width:200px;text-align:right}
 .setup-progress{margin-top:8px}
 .setup-progress .bar{height:5px;background:var(--line);border-radius:4px;overflow:hidden}
 .setup-progress .bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
-.setup-progress span{font-size:12px;color:var(--muted)}
+.setup-progress .bar-model{margin-top:5px}
+.setup-progress .bar-model i{background:#8b5cf6}
+.setup-progress span{font-size:12px;color:var(--muted);display:block}
+button.tiny{padding:3px 10px;font-size:11px;margin-top:5px}
 
 .hero{text-align:center;margin:52px 0 28px}
 .hero h1{font-size:34px;margin:0 0 8px;font-weight:600;letter-spacing:-.5px}
@@ -81,6 +87,7 @@ button.ghost:hover{border-color:var(--accent);color:var(--accent)}
 .weights{margin-top:30px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px}
 .weights .muted{font-size:13px;margin:0 0 16px}
 .weights-list{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.weights-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .wrow{display:flex;justify-content:space-between;gap:12px;padding:10px 12px;background:var(--bg);border-radius:8px;font-size:13px}
 .wrow .f{font-family:ui-monospace,Consolas,monospace;font-size:12px;word-break:break-all}
 .wrow .meta{color:var(--muted);white-space:nowrap;text-align:right}

@@ -1,7 +1,7 @@
 (function () {
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
-  var state = { style: "auto", len: "normal", report: null, poll: null, setupPoll: null };
+  var state = { style: "auto", len: "normal", report: null, poll: null, setupPoll: null, extra: false };
 
   function api(path, body) {
     var opt = body ? {
@@ -22,18 +22,36 @@
     $("tierLine").textContent = "推荐：" + t.name + " — " + t.note + "｜能做：" + t.can.join("、");
     if (rp.app && rp.app.version) $("ver").textContent = "v" + rp.app.version;
 
+    var rt = rp.runtime || {};
+    var rtLine = $("runtimeLine");
+    if (rt.cuda_ok) {
+      rtLine.textContent = "显卡运行环境已就绪（torch " + (rt.torch || "?") +
+        " · CUDA " + (rt.cuda || "?") + "）";
+      rtLine.className = "runtime ok";
+    } else if (rt.wheel_ok) {
+      rtLine.textContent = "显卡运行环境待装：将自动装 torch " + rt.channel +
+        "，匹配你的显卡和驱动";
+      rtLine.className = "runtime warn";
+    } else {
+      rtLine.textContent = rt.wheel_reason || "显卡运行环境待检测";
+      rtLine.className = "runtime warn";
+    }
+
     var need = !rp.comfy.found || !rp.config.exists || rp.nodes.missing.length ||
-               !rp.comfy.online || rp.nodes.skipped.length;
+               !rp.comfy.online || rp.nodes.skipped.length ||
+               !(rt.cuda_ok) || (rp.weights && rp.weights.installed && rp.weights.installed.length === 0);
     var bar = $("setupBar");
     if (need) {
       bar.classList.remove("hidden");
       var bits = [];
+      if (!rt.cuda_ok && rt.wheel_ok) bits.push("运行环境");
       if (!rp.comfy.found) bits.push("推理引擎");
       if (!rp.config.exists) bits.push("配置");
       if (rp.nodes.missing.length) bits.push(rp.nodes.missing.length + " 个工具");
       if (!rp.comfy.online) bits.push("启动服务");
-      $("btnSetup").textContent = "一键配好（" + bits.join("、") + "）";
-      $("goHint").textContent = "先把上面几项配好，出片会更顺";
+      if (!rp.weights || !rp.weights.installed || !rp.weights.installed.length) bits.push("出片模型");
+      $("btnSetup").textContent = "一键配好（" + (bits.join("、") || "检查中") + "）";
+      $("goHint").textContent = "运行环境、工具、模型全自动装，含几十 GB 下载，可随时停止";
     } else {
       bar.classList.add("hidden");
       $("goHint").textContent = "本机已就绪，直接开始";
@@ -53,6 +71,9 @@
   function startSetup() {
     $("btnSetup").disabled = true;
     $("setupProgress").classList.remove("hidden");
+    $("modelBarWrap").classList.add("hidden");
+    $("modelMsg").classList.add("hidden");
+    $("modelBarFill").style.width = "0%";
     $("setupMsg").textContent = "开始装配…";
     api("/api/quick/provision", {}).then(function (r) {
       if (r.error || r.started === false) {
@@ -61,6 +82,7 @@
         return;
       }
       pollSetup();
+      pollModelDuringSetup();
     });
   }
 
@@ -73,17 +95,39 @@
         $("setupMsg").textContent = s.msg + (s.total ? "（" + s.progress + "/" + s.total + "）" : "");
         if (s.running) { pollSetup(); return; }
         $("btnSetup").disabled = false;
-        $("setupProgress").classList.add("hidden");
-        var bits = [];
-        if (s.failed && s.failed.length) {
-          bits = s.failed.map(function (f) { return f.id + "：" + f.msg; });
-          $("setupMsg").textContent = "部分未完成：" + bits.join("；");
-        } else {
-          $("setupMsg").textContent = "配好了";
-        }
-        loadScan().then(loadWeights);
+        // 模型下载可能比装配晚结束，等模型状态也停下再收起进度条
+        api("/api/quick/models/status").then(function (ms) {
+          if (ms && ms.running) { setTimeout(pollSetup, 1200); return; }
+          $("setupProgress").classList.add("hidden");
+          var bits = [];
+          if (s.failed && s.failed.length) {
+            bits = s.failed.map(function (f) { return f.id + "：" + f.msg; });
+            $("setupMsg").textContent = "部分未完成：" + bits.join("；");
+          } else {
+            $("setupMsg").textContent = "配好了";
+          }
+          if (ms && ms.failed && ms.failed.length) {
+            $("setupMsg").textContent += "；模型未下完：" +
+              ms.failed.map(function (f) { return f.file; }).join("、");
+          }
+          loadScan().then(function () { loadWeights(state.extra); });
+        });
       }).catch(pollSetup);
     }, 900);
+  }
+
+  // 装配里含模型下载时，单独轮询模型进度显示第二段紫色进度条
+  function pollModelDuringSetup() {
+    api("/api/quick/models/status").then(function (m) {
+      if (!m || !m.running) return;
+      $("modelBarWrap").classList.remove("hidden");
+      $("modelMsg").classList.remove("hidden");
+      $("modelBarFill").style.width = (m.pct || 0) + "%";
+      var speed = m.speed ? " · " + m.speed + " B/s" : "";
+      $("modelMsg").textContent = "下载模型 " + (m.index || 0) + "/" + (m.total || 0) +
+        "：" + (m.file || "") + speed;
+      setTimeout(pollModelDuringSetup, 1500);
+    }).catch(function () {});
   }
 
   /* ---------------- 出片 ---------------- */
@@ -181,18 +225,68 @@
       list.map(function (w) { return "· " + w; }).join("<br>");
   }
 
-  /* ---------------- 模型清单 ---------------- */
-  function loadWeights() {
-    return api("/api/quick/weights").then(function (d) {
-      if (d.error || !d.missing || !d.missing.length) { $("weightsPanel").classList.add("hidden"); return; }
+  /* ---------------- 模型套餐 ---------------- */
+  function fmtSize(n) {
+    if (n >= 1e9) return (n / 1e9).toFixed(1) + " GB";
+    if (n >= 1e6) return (n / 1e6).toFixed(0) + " MB";
+    return String(n);
+  }
+
+  function loadWeights(extra) {
+    return api("/api/quick/models/plan" + (extra ? "?extra=1" : "")).then(function (d) {
+      if (d.error || !d.items) { $("weightsPanel").classList.add("hidden"); return; }
+      var pending = d.items.filter(function (m) { return !m.installed; });
       $("weightsPanel").classList.remove("hidden");
-      $("weightsList").innerHTML = d.missing.map(function (m) {
-        var tag = m.required ? '<span class="badge req">必需</span>' : '<span class="badge opt">可选</span>';
+      $("weightsIntro").textContent = pending.length
+        ? ("按你的显卡选了一套最小可出片组合，共 " + fmtSize(d.need_bytes) +
+           "。一键下载、断点续传、下过的不会重复；也可随时加装增强模型。")
+        : "这套配置的模型已齐全，可以直接出片。想解锁数字人/指令改图可加装增强模型。";
+      $("weightsList").innerHTML = d.items.map(function (m) {
+        var tag = m.installed
+          ? '<span class="badge opt">已装</span>'
+          : '<span class="badge req">待下载</span>';
         return '<div class="wrow"><div><div class="f">' + tag + m.file + "</div>" +
-          "<div class=\"muted\">" + m.purpose + "</div></div>" +
-          '<div class="meta">' + m.size + "<br>" + m.dir + "</div></div>";
+          '<div class="muted">' + m.dir + "</div></div>" +
+          '<div class="meta">' + fmtSize(m.size) + "</div></div>";
       }).join("");
+      $("btnDownloadModels").classList.toggle("hidden", pending.length === 0);
+      $("btnDownloadModels").textContent = "一键下载这套模型（" + fmtSize(d.need_bytes) + "）";
+      $("btnExtraModels").textContent = extra ? "仅显示基础套餐" : "加装数字人/改图增强";
+      state.extra = !!extra;
     });
+  }
+
+  function startModelDownload() {
+    $("btnDownloadModels").disabled = true;
+    $("modelProgress").classList.remove("hidden");
+    $("modelPageMsg").textContent = "准备下载…";
+    api("/api/quick/models/download", { extra: state.extra }).then(function (r) {
+      if (r.error || r.started === false) {
+        $("modelPageMsg").textContent = r.msg || r.error || "启动失败";
+        $("btnDownloadModels").disabled = false;
+        return;
+      }
+      pollModelPage();
+    });
+  }
+
+  function pollModelPage() {
+    api("/api/quick/models/status").then(function (m) {
+      $("modelPageFill").style.width = (m.pct || 0) + "%";
+      var speed = m.speed ? " · " + m.speed + " B/s" : "";
+      $("modelPageMsg").textContent = m.file
+        ? ("下载 " + (m.index || 0) + "/" + (m.total || 0) + "：" + m.file + speed)
+        : (m.msg || "处理中…");
+      if (m.running) { setTimeout(pollModelPage, 1500); return; }
+      $("btnDownloadModels").disabled = false;
+      if (m.failed && m.failed.length) {
+        $("modelPageMsg").textContent = "部分未下完：" +
+          m.failed.map(function (f) { return f.file; }).join("、") + "（可重试，会续传）";
+      } else {
+        $("modelPageMsg").textContent = "下载完成，可以出片了";
+      }
+      loadWeights(state.extra);
+    }).catch(function () { setTimeout(pollModelPage, 2000); });
   }
 
   /* ---------------- 事件绑定 ---------------- */
@@ -212,6 +306,13 @@
   });
 
   $("btnSetup").addEventListener("click", startSetup);
+  $("btnStopSetup").addEventListener("click", function () {
+    api("/api/quick/provision/stop", {});
+    api("/api/quick/models/stop", {});
+    $("setupMsg").textContent = "已请求停止，当前步骤完成后停";
+  });
+  $("btnDownloadModels").addEventListener("click", startModelDownload);
+  $("btnExtraModels").addEventListener("click", function () { loadWeights(!state.extra); });
   $("btnGo").addEventListener("click", startAuto);
   $("btnStop").addEventListener("click", function () {
     api("/api/story/auto/stop", {});
@@ -223,8 +324,10 @@
     $("source").focus();
     window.scrollTo({ top: 0, behavior: "smooth" });
   });
-  $("btnReloadWeights").addEventListener("click", function () { loadScan().then(loadWeights); });
+  $("btnReloadWeights").addEventListener("click", function () {
+    loadScan().then(function () { loadWeights(state.extra); });
+  });
 
   /* ---------------- 启动 ---------------- */
-  loadScan().then(loadWeights);
+  loadScan().then(function () { loadWeights(false); });
 })();

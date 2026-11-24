@@ -15,7 +15,7 @@ registry.dispatch 未命中时返回 False，请求继续走旧逻辑（绞杀�
 
 import time
 
-VERSION = "0.6.0"
+VERSION = "0.7.0"
 CODENAME = "JJOS"
 START_TS = time.time()
 

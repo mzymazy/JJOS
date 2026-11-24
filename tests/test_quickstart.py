@@ -53,6 +53,8 @@ class PlanTest(unittest.TestCase):
             "nodes": {"missing": ["ComfyUI-VideoHelperSuite"], "skipped": []},
             "workflows": {"count": 16, "installed": 16},
             "machine": {"git": True, "ffmpeg": True},
+            "runtime": {"channel": "cu128", "wheel_ok": True,
+                        "wheel_reason": "RTX 5080 → cu128"},
         }
         plan = q.build_plan(report)
         ids = {p["id"] for p in plan}
@@ -60,7 +62,9 @@ class PlanTest(unittest.TestCase):
         auto = {p["id"] for p in plan if p["kind"] == "auto"}
         self.assertIn("comfy", auto)
         self.assertIn("nodes", auto)
-        self.assertNotIn("weights", auto)  # 权重绝不自动下载
+        # 0.7.0 起权重进入一键装配：按档位下最小套餐，断点续传，不重复下载。
+        self.assertIn("runtime", auto)
+        self.assertIn("weights", auto)
 
     def test_ready_machine_hides_setup(self):
         report = {
@@ -69,6 +73,14 @@ class PlanTest(unittest.TestCase):
             "nodes": {"missing": [], "skipped": []},
             "workflows": {"count": 16, "installed": 16},
             "machine": {"git": True, "ffmpeg": True},
+            "runtime": {"cuda_ok": True, "torch": "2.7.0", "cuda": "12.8"},
+            # 权重全装：套餐判定为 need_bytes=0，不应再出现在待办
+            "weights": {"installed": [{"file": f} for f in (
+                "flux1-dev-fp8.safetensors", "flux-vae-bf16.safetensors",
+                "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+                "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
+                "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+                "wan_2.1_vae.safetensors", "clip_vision_h.safetensors")]},
         }
         plan = q.build_plan(report)
         needed = [p for p in plan if p["need"] and p["kind"] == "auto"]

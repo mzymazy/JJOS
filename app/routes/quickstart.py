@@ -49,6 +49,39 @@ def api_quick_provision_stop(ctx):
 
 
 @get("/api/quick/weights", name="quick_weights",
-     doc="模型清单：缺哪个、放哪目录、多大（不自动下载）")
+     doc="模型清单：缺哪个、放哪目录、多大")
 def api_quick_weights(ctx):
     return ctx.json(quickstart.weights_guide())
+
+
+@get("/api/quick/models/plan", name="quick_models_plan",
+     doc="按显卡档位生成最小可出片模型套餐（含体积与已装状态）")
+def api_quick_models_plan(ctx):
+    from .. import models as M
+    rp = quickstart.scan()
+    comfy = rp["comfy"]["dir"] or ""
+    extra = str(ctx.q1("extra") or "").lower() in ("1", "true", "yes")
+    return ctx.json(M.plan(rp["tier"]["id"], comfy,
+                           [m["file"] for m in rp["weights"]["installed"]], extra))
+
+
+@post("/api/quick/models/download", name="quick_models_download",
+      doc="一键下载模型套餐（后台，断点续传，可停止）")
+def api_quick_models_download(ctx):
+    body = ctx.body or {}
+    tier = body.get("tier") or None
+    extra = str(body.get("extra") or "").lower() in ("1", "true", "yes")
+    ok, msg = quickstart.start_download_models(tier, extra)
+    return ctx.json({"started": ok, "msg": msg})
+
+
+@get("/api/quick/models/status", name="quick_models_status",
+     doc="模型下载进度轮询（file/index/total/pct/speed）")
+def api_quick_models_status(ctx):
+    return ctx.json(quickstart.model_status())
+
+
+@post("/api/quick/models/stop", name="quick_models_stop",
+      doc="停止模型下载（已下部分保留，下次续传）")
+def api_quick_models_stop(ctx):
+    return ctx.json(quickstart.stop_download_models())

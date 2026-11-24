@@ -21,12 +21,16 @@
     <div class="setup-left">
       <div class="machine" id="machineLine">正在检测这台电脑…</div>
       <div class="tier" id="tierLine"></div>
+      <div class="runtime" id="runtimeLine"></div>
     </div>
     <div class="setup-right">
       <button id="btnSetup" class="primary">一键配好</button>
       <div id="setupProgress" class="setup-progress hidden">
         <div class="bar"><i id="setupBarFill"></i></div>
         <span id="setupMsg">准备中…</span>
+        <div class="bar bar-model hidden" id="modelBarWrap"><i id="modelBarFill"></i></div>
+        <span id="modelMsg" class="hidden"></span>
+        <button id="btnStopSetup" class="ghost tiny">停止</button>
       </div>
     </div>
   </section>
@@ -83,10 +87,18 @@
     </section>
 
     <section id="weightsPanel" class="weights hidden">
-      <h2>还差这些模型，补齐后片子更完整</h2>
-      <p class="muted">模型很大（几十 GB），程序不会偷偷下载。照着清单放进对应文件夹就行。</p>
+      <h2>出片模型</h2>
+      <p class="muted" id="weightsIntro">按你的显卡选了一套最小可出片组合，一键下载、断点续传、下过的不会重复。</p>
       <div id="weightsList" class="weights-list"></div>
-      <button id="btnReloadWeights" class="ghost">重新检测</button>
+      <div class="weights-actions">
+        <button id="btnDownloadModels" class="primary">一键下载这套模型</button>
+        <button id="btnExtraModels" class="ghost">加装数字人/改图增强</button>
+        <button id="btnReloadWeights" class="ghost">重新检测</button>
+      </div>
+      <div id="modelProgress" class="setup-progress hidden">
+        <div class="bar"><i id="modelPageFill"></i></div>
+        <span id="modelPageMsg">准备下载…</span>
+      </div>
     </section>
   </main>
 
