@@ -17,6 +17,7 @@ MODULES = [
     "chat",     # 对话与流式推送
     "story",    # 分镜故事板 / 自动路由建议（转发 storyboard、router）
     "plugins",  # 插件平台：声明式工作流接入（/api/plugins）
+    "quickstart",  # 零配置入口：机器检测 / 自动装配 / 傻瓜操作台数据（/api/quick）
 ]
 
 LOADED = []

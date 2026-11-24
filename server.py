@@ -1583,6 +1583,9 @@ class Handler(BaseHTTPRequestHandler):
         # 常用页面允许免 /static 前缀直达，避免手输地址 404
         if path in ("/studio", "/studio.html", "/pro", "/story"):
             return self._serve_static("studio.html")
+        # 傻瓜操作台：一句话成片，零配置入口
+        if path in ("/quick", "/quick.html", "/easy"):
+            return self._serve_static("quick.html")
         if path.startswith("/static/"):
             return self._serve_static(path[len("/static/"):])
 

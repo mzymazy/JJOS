@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JJOS · 一句话成片</title>
+<link rel="stylesheet" href="/static/quick.css">
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand"><span class="dot"></span> JJOS <span class="sub">一句话成片</span></div>
+    <nav>
+      <a href="/" class="muted">完整工作台</a>
+      <span id="ver" class="ver"></span>
+    </nav>
+  </header>
+
+  <!-- 状态条：机器检测 + 一键配好。配好后自动收起 -->
+  <section id="setupBar" class="setup-bar hidden">
+    <div class="setup-left">
+      <div class="machine" id="machineLine">正在检测这台电脑…</div>
+      <div class="tier" id="tierLine"></div>
+    </div>
+    <div class="setup-right">
+      <button id="btnSetup" class="primary">一键配好</button>
+      <div id="setupProgress" class="setup-progress hidden">
+        <div class="bar"><i id="setupBarFill"></i></div>
+        <span id="setupMsg">准备中…</span>
+      </div>
+    </div>
+  </section>
+
+  <main>
+    <div class="hero">
+      <h1>把想法变成片子</h1>
+      <p class="lead">不用买课，不用配环境。贴上你的故事，剩下的这台电脑自己干。</p>
+    </div>
+
+    <section class="composer">
+      <textarea id="source" placeholder="粘贴一段小说、新闻，或写几句话。比如：一个外卖员雨夜送餐，摔倒了，顾客开门递给他毛巾……"></textarea>
+      <div class="composer-foot">
+        <div class="chips" id="styleChips">
+          <button class="chip active" data-style="auto">自动选择</button>
+          <button class="chip" data-style="cinema">电影感</button>
+          <button class="chip" data-style="anime">动漫</button>
+          <button class="chip" data-style="real">真人短剧</button>
+        </div>
+        <div class="chips">
+          <button class="chip" data-len="short">短一点</button>
+          <button class="chip active" data-len="normal">标准</button>
+          <button class="chip" data-len="long">长一点</button>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="btnGo" class="go">开始出片 <span>→</span></button>
+        <span id="goHint" class="hint"></span>
+      </div>
+    </section>
+
+    <section id="stagePanel" class="stage-panel hidden">
+      <div class="stage-title"><span id="stageDot" class="pulse"></span> <b id="stageName">准备中</b></div>
+      <div class="stage-detail" id="stageMsg"></div>
+      <div class="stage-bar"><i id="stageFill"></i></div>
+      <div class="stage-steps" id="stageSteps"></div>
+      <button id="btnStop" class="ghost">停止</button>
+    </section>
+
+    <section id="resultPanel" class="result hidden">
+      <h2>你的片子好了</h2>
+      <div class="result-grid">
+        <div class="player">
+          <video id="video" controls playsinline></video>
+          <div id="noVideo" class="no-video hidden"></div>
+        </div>
+        <div class="result-side">
+          <div id="resultInfo" class="info"></div>
+          <a id="download" class="primary dl" href="#">下载整包</a>
+          <button id="btnAgain" class="ghost">再做一条</button>
+        </div>
+      </div>
+      <div id="warnings" class="warnings hidden"></div>
+    </section>
+
+    <section id="weightsPanel" class="weights hidden">
+      <h2>还差这些模型，补齐后片子更完整</h2>
+      <p class="muted">模型很大（几十 GB），程序不会偷偷下载。照着清单放进对应文件夹就行。</p>
+      <div id="weightsList" class="weights-list"></div>
+      <button id="btnReloadWeights" class="ghost">重新检测</button>
+    </section>
+  </main>
+
+  <footer>本机运行 · 不上传你的故事 · 不花 API 钱</footer>
+</div>
+<script src="/static/quick.js"></script>
+</body>
+</html>
