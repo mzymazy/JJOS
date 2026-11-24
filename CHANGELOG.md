@@ -4,6 +4,17 @@
 
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循语义化版本。
 
+## [0.8.0] - 2026-11-25
+
+补上「从零到能跑起来」的最后一段：用户机器上没有 Python 时，`.py` 安装脚本根本无法启动。新增一键安装包，让「有好显卡但不会装环境」的人双击即用。
+
+### 新增
+
+- **`一键安装.bat` + `bootstrap-install.ps1`**：双击入口用 Windows 自带 PowerShell 自举——检测系统 Python（按 torch wheel 覆盖度打分，优先 3.11/3.12，过新的 3.14 给提示）；没有则下载 python-build-standalone 免安装版，SHA256 + 大小双校验、断点续传、多镜像回退（内置源实测可达性排序）。bat 保持纯 ASCII、ps1 带 UTF-8 BOM，规避 Windows 代码页与中文路径的坑。
+- **`bootstrap.py` 编排层**：复用 `install.py` 准备 ComfyUI / 配置 / 启动器；无 git 时改为下载 ComfyUI 源码 zip 并解压，真正不挑机器。全程幂等、支持 `--dry-run`。
+- **`一键启动.bat` / `.sh`**：中文启动脚本，一起拉起 ComfyUI 与 JJOS，路径写绝对路径。
+- `tests/test_oneclick.py`：12 项测试覆盖幂等、干跑、配置绝对路径、启动脚本内容、内置版本元数据与 BOM/编码约束。全量测试 396 项通过。
+
 ## [0.7.0] - 2026-11-25
 
 把「有好显卡却装不起来」这条链路上最后两道门槛——torch/CUDA 环境和几十 GB 权重——变成自动完成。`/quick` 从"检测+配工具"升级为真正的零配置入口：点一次「一键配好」，从环境到模型全自动就绪。

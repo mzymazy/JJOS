@@ -6,6 +6,23 @@
 
 把 ComfyUI 里那堆节点工作流收成声明式插件，用浏览器点几下就出图出片。
 
+## 一键安装包（0.8.0 起）：从零到出片，三步
+
+这是给「有好显卡、但不想装环境 / 不会配 Python」的人准备的入口。**不需要先装 Python、不需要懂命令行**——Windows 自带 PowerShell 会把该装的一次配好。
+
+1. 下载 JJOS（GitHub 上点 **Code → Download ZIP**，解压到任意目录）。
+2. **双击 `一键安装.bat`**。它会自动完成：
+   - 检测系统里的 Python；没有就下载一个**免安装版 Python**（约 49MB，哈希 + 大小双校验，断点续传，多镜像回退）。
+   - 优先挑 3.11 / 3.12（对 torch 支持最好）；只有很新的 3.14 时会给出提示。
+   - 准备 ComfyUI（有 git 走 clone，没 git 自动下载源码 zip）、生成 `config.json`、写好中文启动脚本。
+   - 全程幂等：已有配置 / 脚本 / 引擎一律保留，不覆盖。
+3. **双击 `一键启动.bat`** → 浏览器自动打开傻瓜操作台 → 第一次点一次「一键配好」→ 贴故事、选风格、开始出片。
+
+- 想先看会做什么、不写入任何文件？设环境变量 `JJOS_DRY_RUN=1` 再双击即为预演；或命令行跑 `python bootstrap.py --dry-run`。
+- 下载源不通时可用 `JJOS_PY_MIRROR` 指定镜像前缀；内置 Python 版本可用 `JJOS_PY_BUNDLE_VER` / `JJOS_PY_VERSION` / `JJOS_PY_SHA256` / `JJOS_PY_SIZE` 覆盖（升级内置版本时改这四项即可，无需改逻辑）。
+- macOS / Linux 没有自举段（系统自带 Python），跑 `python3 bootstrap.py` 后执行 `sh 一键启动.sh` 即可。
+- 免安装 Python 只放在 `%LOCALAPPDATA%\JJOS\runtime`，不进仓库、不污染系统 PATH；权重与 torch 仍由 `/quick` 页面按需下载，不会在双击时干等几 GB。
+
 ## 傻瓜操作台（0.6.0 起，0.7.0 补齐全自动装机）
 
 打开 **`http://127.0.0.1:8890/quick`**，只有三步：**贴一段故事 → 选风格 → 点「开始出片」**。第一次进来点一次「一键配好」，之后就不用再管环境。
