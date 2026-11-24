@@ -4,6 +4,27 @@
 
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循语义化版本。
 
+## [0.4.0] - 2026-11-25
+
+把 README 里写了很久的「一键安装」真正落成命令：**克隆下来先跑 `python install.py`**，
+ComfyUI 目录、配置与启动脚本一次性备好；权重与 Ollama 依旧诚实留给用户按向导补。
+
+### 新增
+
+- **`install.py`（零第三方依赖）**：Python 版本校验、ComfyUI 目录探测与可选 `git clone --depth 1`、
+  生成 `config.json`（绝对路径，默认输出落在项目 `output/`）、生成 `start.bat` / `start.sh`
+  双平台启动脚本。已有配置与启动脚本一律保留，除非显式 `--force-config`。
+- 支持 `--comfy-dir`、`--output-dir`、`--port`、`--bind`、`--skip-clone`、`--dry-run`：
+  本机已有 ComfyUI 时可指过去，干跑模式只打印计划不写盘。
+- 安装结束打印明确的「还需要你做的」清单（权重路径、模型页、Ollama、启动、体检），
+  不把「没下载权重」伪装成「安装完成」。
+- `tests/test_installer.py`：10 项用例覆盖配置生成 / 不覆盖 / 干跑 / Comfy 目录三态 /
+  启动脚本内容与保留策略。
+
+### 变更
+
+- README 补「一键安装」一节，启动命令改为先跑安装器；版本号同步到 0.4.0。
+
 ## [0.3.2] - 2026-11-22
 
 这一版把上库前审出来的两项 P0 收干净：**换台机器能不能跑**、**盘符还写不写死在代码里**。

@@ -14,12 +14,29 @@
 - **零强制依赖**：`requirements.txt` 保持为空，HTTP 服务、路由、任务持久化全部只用 Python 标准库。少数环节（`storyboard.py` 的逐帧曝光归正用 numpy、送视觉模型前压图用 PIL）属于**可选加速**：装了走增强路径，没装自动降级（曝光归正跳过并保留原片、压图回落原图），不影响启动与主链路。
 - **旧链路不删**：`app/registry.dispatch` 未命中返回 `False` 才回落到 `server.py` 旧实现（绞杀者模式），增量迁移不留断点。
 
+## 一键安装（0.4.0 起）
+
+克隆下来后跑一次安装器，它会准备好 ComfyUI 目录、生成 `config.json` 并写好启动脚本：
+
+```powershell
+python install.py                        # ComfyUI 默认放在 JJOS 同级目录
+python install.py --comfy-dir D:\ComfyUI # 已有 ComfyUI 就指过去
+python install.py --dry-run              # 只看计划，不写文件
+```
+
+- 已有 `config.json` **绝不覆盖**（要覆盖加 `--force-config`）；已有 `start.bat` / `start.sh` 同样保留。
+- 不会自动下载权重：几十 GB 的文件来源各异，安装器只打印「缺什么、放哪、多大」，由下面的自检向导接着引导。
+- Ollama 与显卡驱动只提示不静默安装，装完执行 `ollama pull qwen3:8b` 即可。
+
 ## 启动
 
 ```powershell
-cd jjos
-python server.py
+cd JJOS-studio
+python install.py      # 首次使用跑一次即可
 ```
+
+之后 Windows 双击 `start.bat`，macOS/Linux 执行 `sh start.sh`，ComfyUI 与 JJOS 会一起起来；
+只想单独起 JJOS（ComfyUI 已在别处运行）时仍然可以 `python server.py`。
 
 - JJOS 创作台：http://127.0.0.1:8890/static/studio.html
 - 插件台：http://127.0.0.1:8890/plugins （按插件 io.json 自动生成表单）
