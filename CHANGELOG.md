@@ -4,6 +4,23 @@
 
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循语义化版本。
 
+## [0.5.0] - 2026-11-25
+
+把剧情工坊从「手动点五次」变成真正的一键出片：**贴正文 → 一次提交 → 后台跑完全流程**。
+
+### 新增
+
+- **`POST /api/story/auto`**：一键提交，后台串起拆镜 → 逐镜生成 → 拼接 → 配音 → 整包导出。编排层 `_auto_pipeline` 只调用既有函数（`api_plan` / `_pipeline` / `stitch` / `narrate` / `export_bundle`），不重写业务逻辑；一键出的是可继续编辑的项目，与分步流程共用同一份数据。
+- **`GET /api/story/auto/status`**：返回 `stage` / `msg` / `age` / `warnings` / `result`，前端实时显示进度，长片后台跑可离开页面。
+- **`POST /api/story/auto/stop`**：请求停止；当前镜头跑完后中止，已产出素材仍整包导出。
+- **前端「一键成片 · 从这里开始」按钮**（`studio-story.js`）：带阶段进度、warnings 提示与停止入口；原分步按钮全部保留。
+- `tests/test_story_auto.py`：13 项用例覆盖参数缺省/覆盖、五步编排顺序、只出图跳过拼接配音、各阶段停止信号、中间失败不吞整包导出、status 字段与忙碌拒绝。
+
+### 变更
+
+- `api_stop` 同时置位一键停止信号；README 增「一键成片」入口说明与顶部标语；版本号同步到 0.5.0。
+- 全量测试 342 项通过（1 skipped）。
+
 ## [0.4.0] - 2026-11-25
 
 把 README 里写了很久的「一键安装」真正落成命令：**克隆下来先跑 `python install.py`**，

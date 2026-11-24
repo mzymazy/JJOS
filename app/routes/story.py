@@ -74,6 +74,21 @@ def api_story_stop(ctx):
     return _call(ctx, storyboard.api_stop)
 
 
+@get("/api/story/auto/status", name="story_auto_status", doc="一键出片进度（stage/msg/warnings/result）")
+def api_story_auto_status(ctx):
+    return _call(ctx, storyboard.api_auto_status)
+
+
+@post("/api/story/auto", name="story_auto", doc="一键出片：拆镜→生成→拼接→配音→整包导出，后台执行")
+def api_story_auto(ctx):
+    return _call(ctx, storyboard.api_auto, _body(ctx))
+
+
+@post("/api/story/auto/stop", name="story_auto_stop", doc="请求停止一键出片任务")
+def api_story_auto_stop(ctx):
+    return _call(ctx, storyboard.api_auto_stop)
+
+
 @post("/api/story/stitch", name="story_stitch", doc="把分镜镜头拼接成整片")
 def api_story_stitch(ctx):
     return _call(ctx, storyboard.stitch, _body(ctx))

@@ -82,8 +82,41 @@
           '<option value="photo">写实照片</option><option value="anime">动画</option><option value="illustration">插画</option></select></div>' +
         '<div><label class="f">单镜时长(秒)</label><input id="st-sec" type="number" value="' + (isNews ? 3 : 4) + '" min="2" max="10" /></div>' +
       '</div>' +
-      '<div class="bar"><button id="st-plan">① 拆分镜</button>' +
-      '<span class="p-hint" id="st-plan-hint">用本机 Ollama 拆镜，约 20-60 秒</span></div>';
+      '<div class="bar"><button id="st-auto" style="background:#1b6e4a;border-color:#2fa96f;color:#eafff4">一键成片 · 从这里开始</button>' +
+      '<button class="ghost" id="st-auto-stop" style="display:none">停止一键任务</button>' +
+      '<button class="ghost" id="st-plan">① 拆分镜</button>' +
+      '<span class="p-hint" id="st-plan-hint">一键成片 = 粘贴正文后自动拆镜 → 逐镜生成 → 拼接 → 配音 → 导出整包，全程在后台跑，可离开页面</span></div>' +
+      '<div class="p-hint" id="st-auto-prog" style="color:#7fe0a3"></div>';
+    var autoBtn = p.querySelector("#st-auto");
+    var autoStopBtn = p.querySelector("#st-auto-stop");
+    var autoProg = p.querySelector("#st-auto-prog");
+    autoBtn.addEventListener("click", function () {
+      var src = p.querySelector("#st-src").value.trim();
+      if (!src) return toast("先粘贴正文");
+      autoBtn.disabled = true;
+      autoStopBtn.style.display = "";
+      autoProg.textContent = "已提交，正在排队…";
+      api("/api/story/auto", {
+        mode: cur, source: src, title: p.querySelector("#st-title").value,
+        scenes: +p.querySelector("#st-n").value, ratio: p.querySelector("#st-ratio").value,
+        style: p.querySelector("#st-style").value, seconds: +p.querySelector("#st-sec").value
+      }).then(function (r) {
+        if (r.error) {
+          autoBtn.disabled = false; autoStopBtn.style.display = "none";
+          autoProg.textContent = "";
+          return toast(r.error);
+        }
+        autoPoll(autoBtn, autoStopBtn, autoProg);
+      }).catch(function (e) {
+        autoBtn.disabled = false; autoStopBtn.style.display = "none";
+        autoProg.textContent = "提交失败：" + e;
+      });
+    });
+    autoStopBtn.addEventListener("click", function () {
+      api("/api/story/auto/stop", {}).then(function (r) {
+        toast(r.stopping ? "已请求停止，当前镜头跑完后中止" : (r.msg || "未在跑"));
+      });
+    });
     p.querySelector("#st-plan").addEventListener("click", function () {
       var src = p.querySelector("#st-src").value.trim();
       if (!src) return toast("先粘贴正文");
@@ -250,6 +283,48 @@
     if (proj.running) hint.textContent = "生成中，请稍候…";
     else if (proj.error) hint.textContent = "中断：" + proj.error;
     else hint.textContent = "";
+  }
+
+  /* ---------------- 一键出片进度轮询 ---------------- */
+  var AUTO_LABEL = { plan: "① 拆分镜", generate: "② 逐镜生成", stitch: "③ 拼接成片",
+                     voice: "④ 旁白配音", export: "⑤ 导出整包", done: "完成",
+                     stopped: "已停止", error: "失败", idle: "待开始" };
+  function autoPoll(autoBtn, autoStopBtn, autoProg) {
+    clearInterval(timer);
+    var lastStage = "";
+    timer = setInterval(function () {
+      api("/api/story/auto/status").then(function (r) {
+        if (r.error) return;
+        var label = AUTO_LABEL[r.stage] || r.stage || "处理中";
+        autoProg.textContent = "一键进度：" + label + (r.msg ? " · " + r.msg : "") +
+          (r.age > 120 ? "（已 " + r.age + "s，长片属正常）" : "");
+        if (r.stage !== lastStage) {
+          lastStage = r.stage;
+          if (r.pid) load(r.pid);
+        }
+        if (!r.running) {
+          clearInterval(timer);
+          autoBtn.disabled = false;
+          autoStopBtn.style.display = "none";
+          if (r.warnings && r.warnings.length) {
+            autoProg.textContent += " ｜ 提示：" + r.warnings.join("；");
+          }
+          if (r.stage === "done") {
+            autoProg.textContent = "✅ 一键成片完成" + (r.result && r.result.bundle ? "（整包：" + r.result.bundle + "）" : "");
+            toast("一键成片完成");
+            if (r.pid) load(r.pid);
+          } else if (r.stage === "stopped") {
+            toast("一键任务已停止");
+            if (r.pid) load(r.pid);
+          } else if (r.stage === "error") {
+            toast("一键失败：" + (r.msg || ""));
+            if (r.pid) load(r.pid);
+          }
+        }
+      }).catch(function (e) {
+        autoProg.textContent = "进度查询失败：" + e;
+      });
+    }, 2500);
   }
 
   /* ---------------- 轮询 ---------------- */

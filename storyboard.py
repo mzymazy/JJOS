@@ -32,6 +32,12 @@ COMFY_OUT = os.environ.get("JJOS_COMFY_OUT") or _OUTPUT_ROOTS[0]
 
 LOCK = threading.RLock()
 RUN = {"id": None, "stop": False, "msg": "", "ts": 0}
+# 一键出片编排状态：独立于 RUN（RUN 归 _pipeline 用），但共用同一张卡/同一个闸门。
+# stage: idle/plan/generate/stitch/voice/export/done/stopped/error
+AUTO = {"id": None, "pid": None, "stage": "idle", "msg": "", "stop": False,
+        "ts": 0, "error": "", "warnings": [], "result": {}}
+AUTO_STAGES = ("idle", "plan", "generate", "stitch", "voice", "export",
+               "done", "stopped", "error")
 
 # app/log.py 的延迟句柄：本模块被 app.routes.media 反向 import，顶层直接
 # `from app import log` 会踩循环导入，故首次用时再取，取不到就静默降级。
@@ -1802,6 +1808,166 @@ def api_run(b):
 
 def api_stop():
     RUN["stop"] = True
+    AUTO["stop"] = True
+    return {"stopping": True}
+
+
+# ---------------------------------------------------------------- 一键出片
+def _auto_set(stage, msg, **kw):
+    """推进一键编排状态；每次变更都打时间戳，前端据此判断卡死。"""
+    AUTO["stage"] = stage
+    AUTO["msg"] = msg
+    AUTO["ts"] = time.time()
+    for k, v in kw.items():
+        AUTO[k] = v
+    _set_msg("[auto] " + msg)
+
+
+def _auto_opts(b, it):
+    """一键出片的生成参数：与 api_run 的 opts 同源，缺省更保守（h3/33帧/4步）。"""
+    return {"engine": (b.get("engine") or "h3").strip().lower(),
+            "do_video": bool(b.get("do_video", True)),
+            "length": int(b.get("length") or 33),
+            "fps": float(b.get("fps") or 16),
+            "steps_img": int(b.get("steps_img") or 28),
+            "steps_vid": int(b.get("steps_vid") or 4),
+            "guidance": float(b.get("guidance") or 3.8),
+            "cfg": float(b.get("cfg") or 1.0),
+            "cfg_img": float(b.get("cfg_img") or 2.0),
+            "negative": b.get("negative") or "",
+            "only_pending": bool(b.get("only_pending", False)),
+            "strict_action": bool(b.get("strict_action", True)),
+            "stable_seed": bool(b.get("stable_seed", True)),
+            "vqa": bool(b.get("vqa", True)),
+            "vqa_retries": int(b.get("vqa_retries") if b.get("vqa_retries") is not None else 2),
+            "region_strength": float(b.get("region_strength") or 0.8),
+            "width": it.get("width"), "height": it.get("height")}
+
+
+def _auto_pipeline(b):
+    """后台编排：拆镜 → 逐镜生成 → 拼接 → 配音 → 整包导出。
+
+    每步都是对现有同步函数的直接调用，不重复实现业务逻辑；任一步失败写入
+    warnings 而不是立刻判死——成片已出的情况下仍要把素材整包导出来给用户。
+    """
+    pid = None
+    try:
+        _auto_set("plan", "正在拆分镜")
+        it = api_plan(b)
+        if it.get("error"):
+            raise RuntimeError(it["error"])
+        pid = it["id"]
+        AUTO["pid"] = pid
+        if AUTO.get("stop"):
+            _auto_set("stopped", "已停止（拆镜后）", result={"id": pid})
+            return
+
+        _auto_set("generate", "正在逐镜生成")
+        opts = _auto_opts(b, it)
+        # 复用 _pipeline（同步阻塞到整批完成）；它会在 finally 清 RUN 状态。
+        _pipeline(pid, opts)
+        # 停止信号优先于项目状态：_pipeline 正常会把 status 写 stopped，
+        # 但若停止发生在管线收尾之后，仍要以 AUTO["stop"] 为准，不再往下串。
+        if AUTO.get("stop"):
+            _auto_set("stopped", "已停止（生成阶段）", result={"id": pid})
+            return
+        db = _all()
+        cur = _find(db, pid)
+        status = (cur or {}).get("status")
+        if status == "stopped":
+            _auto_set("stopped", "已停止（生成阶段）", result={"id": pid})
+            return
+        if status == "error":
+            raise RuntimeError((cur or {}).get("error") or "生成阶段失败")
+
+        # 拼接：少于 2 段视频时跳过（只出图的项目给 warning，不算失败）
+        _auto_set("stitch", "正在拼接成片")
+        if not opts.get("do_video"):
+            AUTO["warnings"].append("本次只出图未出视频，跳过拼接与配音")
+        else:
+            r = stitch({"id": pid, "fps": opts["fps"],
+                        "ratio": it.get("ratio"), "size": b.get("size")})
+            if r.get("error"):
+                AUTO["warnings"].append("拼接失败：" + str(r["error"]))
+            if AUTO.get("stop"):
+                _auto_set("stopped", "已停止（拼接后）", result={"id": pid})
+                return
+
+        # 配音：台词为空/TTS 不可用都不阻断交付
+        _auto_set("voice", "正在合成旁白")
+        if not opts.get("do_video"):
+            pass
+        else:
+            rv = narrate({"id": pid, "rate": b.get("rate") or 0})
+            if rv.get("error"):
+                AUTO["warnings"].append("配音跳过：" + str(rv["error"]))
+
+        # 整包导出：无论前面有无 warning 都尽量交付
+        _auto_set("export", "正在导出素材整包")
+        rb = export_bundle({"id": pid})
+        result = {"id": pid}
+        if rb.get("error"):
+            AUTO["warnings"].append("整包导出失败：" + str(rb["error"]))
+        else:
+            result["bundle"] = rb.get("name")
+            result["bundle_size"] = rb.get("size")
+
+        cur = _find(_all(), pid) or {}
+        result["final"] = cur.get("final")
+        result["voiced"] = cur.get("voiced")
+        result["final_src"] = cur.get("final_src")
+        result["voiced_src"] = cur.get("voiced_src")
+        result["scenes"] = len(cur.get("scenes") or [])
+        if AUTO.get("stop"):
+            _auto_set("stopped", "已停止（导出后）", result=result)
+            return
+        _auto_set("done", "一键出片完成", result=result)
+    except Exception as e:
+        _say_err("[auto] failed: %s" % str(e)[:200])
+        _auto_set("error", "一键出片失败：%s" % str(e)[:160],
+                  error=str(e)[:300], result={"id": pid} if pid else {})
+    finally:
+        RUN["id"] = None
+        RUN["stop"] = False
+        AUTO["stop"] = False
+
+
+def api_auto(b):
+    """一键出片：一次提交，后台串起拆镜→生成→拼接→配音→导出。"""
+    if AUTO.get("id") and AUTO.get("stage") not in ("done", "error", "stopped", "idle"):
+        return {"error": "已有一键任务在跑：%s（%s）" % (AUTO["id"], AUTO.get("stage"))}
+    if RUN.get("id"):
+        return {"error": "已有生成任务在跑：%s" % RUN["id"]}
+    source = (b.get("source") or "").strip()
+    if not source:
+        return {"error": "请先粘贴小说或新闻文本"}
+    aid = "a" + time.strftime("%m%d%H%M%S")
+    AUTO.update({"id": aid, "pid": None, "stage": "plan", "msg": "排队中",
+                 "stop": False, "ts": time.time(), "error": "", "warnings": [], "result": {}})
+    threading.Thread(target=_auto_pipeline, args=(dict(b),), daemon=True).start()
+    return {"started": aid, "stage": "plan",
+            "hint": "后台执行中，轮询 GET /api/story/auto/status 查看进度"}
+
+
+def api_auto_status():
+    snap = {k: AUTO.get(k) for k in ("id", "pid", "stage", "msg", "ts",
+                                     "error", "warnings", "result")}
+    snap["running"] = AUTO.get("id") is not None and \
+        AUTO.get("stage") not in ("done", "error", "stopped", "idle")
+    snap["age"] = round(time.time() - (AUTO.get("ts") or time.time()), 1)
+    if AUTO.get("pid"):
+        it = _find(_all(), AUTO["pid"])
+        if it:
+            snap["project"] = _brief(it)
+    return snap
+
+
+def api_auto_stop():
+    if not (AUTO.get("id") and api_auto_status()["running"]):
+        return {"stopping": False, "msg": "当前没有在跑的一键任务"}
+    AUTO["stop"] = True
+    RUN["stop"] = True
+    _auto_set(AUTO.get("stage") or "stopped", "正在停止，当前镜头跑完后中止")
     return {"stopping": True}
 
 
@@ -1820,6 +1986,8 @@ def handle_get(h, path, qs):
         return h._send(200, api_list()) or True
     if path == "/api/story":
         return h._send(200, api_get(q1("id"))) or True
+    if path == "/api/story/auto/status":
+        return h._send(200, api_auto_status()) or True
     return False
 
 
@@ -1836,6 +2004,10 @@ def handle_post(h, path, qs, body=None):
             return h._send(200, api_run(b)) or True
         if path == "/api/story/stop":
             return h._send(200, api_stop()) or True
+        if path == "/api/story/auto":
+            return h._send(200, api_auto(b)) or True
+        if path == "/api/story/auto/stop":
+            return h._send(200, api_auto_stop()) or True
         if path == "/api/story/stitch":
             return h._send(200, stitch(b)) or True
         if path == "/api/story/interp":

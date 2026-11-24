@@ -1,6 +1,6 @@
 # JJOS（本地 AI 影视工作站）
 
-> **一键安装 · 一键体检 · 零强制依赖**｜从剧本到成片的本地全链路影视工作站
+> **一键安装 · 一键体检 · 一键成片 · 零强制依赖**｜从剧本到成片的本地全链路影视工作站
 >
 > 你付的是电费，不是 token 费 —— `Local-first AI film studio, no API key required.`
 
@@ -218,6 +218,18 @@ $env:JJOS_PLUGIN_TAKEOVER = "all"      # 或 "/api/txt2img" 只放一条
 
 ## 剧情工坊（自动长文 → 成片）
 入口：`http://127.0.0.1:8890/static/studio.html` → 页面「剧情工坊 · 自动成片」区块（studio-story.js，独立增强层，不改动主面板）。
+
+### 一键成片（0.5.0 起，推荐入口）
+贴正文 → 点页面上的「一键成片 · 从这里开始」→ 后台自动跑完 **拆镜 → 逐镜生成 → 拼接 → 配音 → 整包导出**，可离开页面，进度在页面实时显示。
+
+对应一个提交接口 + 一个进度接口：
+- `POST /api/story/auto`：body 与 `/api/story/plan` 同源（`source` / `mode` / `scenes` / `ratio` / `style` / `seconds`，可选 `engine` / `length` / `fps` / `steps_img` / `steps_vid` / `do_video`），立即返回 `started`，后台编排。
+- `GET /api/story/auto/status`：返回 `stage`（plan/generate/stitch/voice/export/done/stopped/error）、`msg`、`age`、`warnings`、`result`（含 `id`/`bundle`/`final_src`/`voiced_src`）。
+- `POST /api/story/auto/stop`：请求停止（当前镜头跑完后中止，已产出的素材仍会整包导出）。
+
+编排层（storyboard.py `_auto_pipeline`）只串接既有函数，不重写业务逻辑；任一步失败记为 warning，不吞掉已出成片的整包交付。`do_video:false` 时跳过拼接与配音，只出图并整包导出。
+
+想逐镜微调仍用下面的人工分步按钮——一键出的是可继续编辑的项目，不是死链。
 
 两种模式：
 1. 短剧（drama）：贴小说 / 剧本片段，填主角设定、风格、比例、每镜时长、镜数 → ① 拆分镜 → ② 逐镜生成 → ③ 拼接成片 → ④ 旁白配音 → 导出分镜脚本。
