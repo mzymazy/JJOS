@@ -139,6 +139,47 @@ class InstallerMetadataTests(unittest.TestCase):
         self.assertIn("https://gh-proxy.com/", ps1)
         self.assertIn("https://ghproxy.net/", ps1)
 
+    def test_download_avoids_known_powershell_pitfalls(self):
+        """锁住两个实机踩过的坑，防止改回去。
+
+        1. 不能让 curl 进度条直出 stderr（会被包成 NativeCommandError 刷屏红字）；
+        2. 不能用 Start-Process 起 curl（同机有 HTTPS_PROXY/https_proxy 时会抛异常）；
+        3. 不能用 --no-progress-meter（老 Windows 自带 curl 7.55 不支持）。
+        只检查代码行，注释里解释这些坑不算违规。
+        """
+        with open(os.path.join(ROOT, "bootstrap-install.ps1"), encoding="utf-8-sig") as fh:
+            ps1 = fh.read()
+        code = "\n".join(l for l in ps1.splitlines() if not l.strip().startswith("#"))
+        self.assertNotIn("Start-Process", code, "Start-Process 会在代理变量大小写冲突时抛异常")
+        self.assertNotIn("--no-progress-meter", code, "老版 curl 不支持该参数")
+        self.assertIn("curl -L -sS", code, "应使用全版本兼容的 -sS")
+        self.assertIn("2>$null", code, "必须丢弃 stderr 以免误报")
+        self.assertIn("请勿关闭窗口", ps1, "抑制进度条后需要给用户明确的等待提示")
+
+
+class ComfyFallbackMessageTests(unittest.TestCase):
+    def test_success_message_has_no_misleading_skip_text(self):
+        """zip 兜底成功时，不应再显示"不覆盖"这类让人以为失败的话。"""
+        import unittest.mock as mock
+        with mock.patch("install.prepare_comfy",
+                        return_value=("incomplete", "目录已存在但没有 main.py，不覆盖")):
+            with mock.patch.object(B, "download_comfy_zip",
+                                   return_value=(True, "已下载并解压 ComfyUI 到 X")):
+                ok, detail = B.ensure_comfy("/tmp/x")
+        self.assertTrue(ok)
+        self.assertNotIn("不覆盖", detail)
+        self.assertIn("已下载并解压", detail)
+
+    def test_failure_message_keeps_both_reasons(self):
+        import unittest.mock as mock
+        with mock.patch("install.prepare_comfy", return_value=("no-git", "没找到 git")):
+            with mock.patch.object(B, "download_comfy_zip",
+                                   return_value=(False, "下载失败")):
+                ok, detail = B.ensure_comfy("/tmp/x")
+        self.assertFalse(ok)
+        self.assertIn("没找到 git", detail)
+        self.assertIn("下载失败", detail)
+
 
 class DiskCheckTests(unittest.TestCase):
     def test_low_disk_blocks(self):

@@ -4,6 +4,22 @@
 
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循语义化版本。
 
+## [0.8.2] - 2026-11-25
+
+用"干净 PATH"模拟裸机（python/py/git 全部不可见）做了完整冷启动验证，又把两个只在真实环境才暴露的问题修掉。
+
+### 修复
+
+- **下载时满屏红色误报**：curl 进度条走 stderr，直接调用会被 PowerShell 包成 `NativeCommandError`，用户会以为安装崩溃（实际成功了）。改为 `-sS` 抑制进度、丢弃 stderr，用明确的阶段提示代替（"约 49MB，1-5 分钟，请勿关闭窗口"）。
+- **`Start-Process` 在代理环境下直接抛异常**：同机同时存在 `HTTPS_PROXY` 与 `https_proxy` 时，PowerShell 构造子进程环境会因大小写不敏感而键冲突，导致下载彻底失败。已弃用该方案。
+- **`--no-progress-meter` 兼容性**：该参数 curl 7.67+ 才有，老 Windows 10（1809 自带 7.55）会报错；统一改用全版本支持的 `-sS`。
+- **成功却显示"不覆盖"**：zip 兜底成功时仍拼接了原先的"目录已存在但不覆盖"提示，用户会误以为失败；成功时只报成功。
+
+### 验证
+
+- 裸机模拟（PATH 仅保留 System32/Windows/PowerShell）：Python 从 0 自动下载 46.82MB → 校验 → 解压 → git 不可见自动走 zip 兜底 → ComfyUI 1366 文件落地 → config/启动器生成，**stderr 全程为空、EXITCODE=0**。
+- 全量 409 项测试通过（1 skipped）；新增测试锁住上述三个 PowerShell 陷阱，防止改回去。
+
 ## [0.8.1] - 2026-11-25
 
 把 0.8.0 从"能装"推到"装完就能直接用"，并修掉两个会让小白卡死的真实缺陷（均由真机实测暴露）。

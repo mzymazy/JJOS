@@ -132,13 +132,17 @@ function Download-Python {
     foreach ($prefix in $mirrorPrefixes) {
         $url = "$prefix$official"
         Write-Step "  下载源：$url"
-        # -C - 断点续传：网断了重跑会接着下，不从头来
-        try {
-            & $curl -L --fail --retry 3 --retry-delay 2 -C - -o $archive $url
-        } catch {
-            Write-Warn2 "  该源下载失败，换下一个"
-            continue
-        }
+        # -C - 断点续传：网断了重跑会接着下，不从头来。
+        # 两个坑都踩过，这里取最稳写法：
+        #   1) 直接显示进度条不行——curl 进度走 stderr，PowerShell 会包成
+        #      NativeCommandError 刷一屏红色，用户以为装崩了；
+        #   2) 改用独立进程启动也不行——同机同时存在 HTTPS_PROXY / https_proxy 时
+        #      它会直接抛异常，下载彻底失败。
+        # 所以：抑制进度条 + 丢弃 stderr，用明确的阶段提示让用户知道在动。
+        Write-Host '  正在下载，请勿关闭窗口（约 49MB，视网速 1-5 分钟）...' -ForegroundColor DarkGray
+        # 用 -sS 而不是 --no-progress-meter：后者是 curl 7.67+ 才有，
+        # 老 Windows 10（1809 自带 7.55）会直接报错；-sS 从 7.x 早期就支持。
+        & $curl -L -sS --fail --retry 3 --retry-delay 2 -C - -o $archive $url 2>$null
         if ($LASTEXITCODE -ne 0) {
             Write-Warn2 "  该源返回错误（exit $LASTEXITCODE），换下一个"
             continue

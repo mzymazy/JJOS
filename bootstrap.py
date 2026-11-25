@@ -281,7 +281,10 @@ def ensure_comfy(comfy_dir, dry_run=False):
         return True, detail
     # no-git / failed / incomplete → zip 兜底
     ok, detail2 = download_comfy_zip(comfy_dir, dry_run=dry_run)
-    return ok, "%s；改用 zip 下载：%s" % (detail, detail2)
+    if ok:
+        # 兜底成功了就只报成功，别再念"不覆盖"那句让用户以为没装上
+        return True, detail2
+    return False, "%s；改用 zip 下载也失败：%s" % (detail, detail2)
 
 
 def bootstrap(root=None, python_exe=None, comfy_dir=None, port=DEFAULT_PORT,
