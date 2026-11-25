@@ -35,9 +35,11 @@ desktop.ini
 # 本机真实配置（含本机盘符路径）不入库，样例见 config.example.json
 config.json
 
-# install.py 生成的启动脚本内嵌本机 Python / ComfyUI 绝对路径，同样不入库
+# install.py / bootstrap.py 生成的启动脚本内嵌本机 Python / ComfyUI 绝对路径，同样不入库
 /start.bat
 /start.sh
+/一键启动.bat
+/一键启动.sh
 
 # 开发过程截图与临时产物（根目录一次性调试文件，不入库）
 /*.png

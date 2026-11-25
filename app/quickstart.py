@@ -331,7 +331,7 @@ def build_plan(report=None):
     if rp["comfy"]["found"]:
         add("comfy", "推理引擎", "已找到 %s" % rp["comfy"]["dir"], "ok", False)
     else:
-        add("comfy", "推理引擎", "下载并配置 ComfyUI（约 200MB，自动完成）",
+        add("comfy", "推理引擎", "下载并配置 ComfyUI（源码约 20MB，自动完成）",
             "auto", True)
 
     if rp["config"]["exists"]:

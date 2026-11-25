@@ -191,13 +191,22 @@ $extraArgs = @()
 if ($env:JJOS_DRY_RUN) { $extraArgs += '--dry-run' }
 & $pythonExe $entry --python $pythonExe @extraArgs
 if ($LASTEXITCODE -ne 0) {
-    Write-Bad '[X] 安装编排失败，请根据上面的提示处理后再试。'
+    Write-Bad '[X] 安装编排失败。'
+    $logPath = Join-Path $jjosDir 'logs\install.log'
+    if (Test-Path $logPath) {
+        Write-Bad "  这次安装的记录已保存在：$logPath"
+        Write-Bad '  遇到问题把该文件发给技术支持即可定位。'
+    }
+    Write-Bad '  处理后重新双击「一键安装.bat」即可，已装好的部分不会重装。'
     exit 1
 }
 
 Write-Ok '[3/3] 安装完成！'
 Write-Host ''
 Write-Host '  下一步：双击本目录的「一键启动.bat」' -ForegroundColor Green
-Write-Host '  浏览器会自动打开傻瓜操作台，第一次进去点一次「一键配好」即可。' -ForegroundColor Green
+Write-Host '  浏览器会自动打开傻瓜操作台，缺的环境会在后台自动补好。' -ForegroundColor Green
+Write-Host '  首次启动会下载 torch/CUDA 等组件（约 2-3GB），请耐心等进度条走完。' -ForegroundColor Yellow
+Write-Host ''
+Write-Host "  安装记录：$(Join-Path $jjosDir 'logs\install.log')" -ForegroundColor DarkGray
 Write-Host ''
 if (-not $env:JJOS_NO_PAUSE) { Read-Host '按回车键关闭' | Out-Null }

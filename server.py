@@ -1692,6 +1692,13 @@ def main():
                 or os.environ.get("LOCALJIMENG_BIND") or "127.0.0.1")
     srv = ThreadingHTTPServer((BIND, PORT), Handler)
     url = f"http://127.0.0.1:{PORT}"
+    # 一键安装包启动器设 JJOS_OPEN=quick，让小白双击后直接进傻瓜台；
+    # 手动 python server.py 不设此变量，仍进熟悉的首页，行为不变。
+    open_path = (os.environ.get("JJOS_OPEN") or "").strip().lower()
+    if open_path in ("quick", "/quick", "easy", "/easy"):
+        open_url = url + "/quick"
+    else:
+        open_url = url
     print(f"JJOS 已启动: {url}")
     print(f"ComfyUI: {COMFY}  状态: {'在线' if comfy_online() else '离线'}")
     print(f"监听地址: {BIND}:{PORT}  输出目录: {OUTPUT_ROOTS[0]}")
@@ -1701,6 +1708,14 @@ def main():
         print(f"  令牌访问示例: http://<本机IP>:{PORT}/?token={_tk}")
     else:
         print("仅本机可访问；需局域网/手机访问时设置环境变量 JJOS_BIND=0.0.0.0")
+    # 首启自动装配：仅当启动器设置 JJOS_AUTOPROVISION=1 时，后台补环境与工具。
+    # 直接 python server.py 不触发，开发者习惯不变；权重不在此自动下载。
+    try:
+        from app import autostart as _autostart
+        if _autostart.maybe_start():
+            print("已开启首启自动装配：缺环境会在后台自动补，装到哪一步请看 /quick 页面")
+    except Exception:
+        _autostart = None
     if _SKELETON_OK:
         try:
             from app.registry import describe
@@ -1713,7 +1728,7 @@ def main():
         except Exception:
             pass
     try:
-        webbrowser.open(url)
+        webbrowser.open(open_url)
     except Exception:
         pass
     srv.serve_forever()

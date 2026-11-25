@@ -92,6 +92,8 @@ def cn_bat_launcher(python_exe, comfy_dir, bind, port):
         'cd /d "%~dp0"\r\n'
         f'set "JJOS_PY={py}"\r\n'
         f'set "JJOS_COMFY={comfy}"\r\n'
+        'set "JJOS_OPEN=quick"\r\n'
+        'set "JJOS_AUTOPROVISION=1"\r\n'
         "echo ============================================\r\n"
         "echo   JJOS 本地 AI 影视工作站  正在启动\r\n"
         "echo ============================================\r\n"
@@ -124,7 +126,7 @@ def cn_sh_launcher(python_exe, comfy_dir, bind, port):
         + f'(cd "$JJOS_COMFY" && "$JJOS_PY" main.py --listen 127.0.0.1 --port {COMFY_PORT}) &\n'
         + "trap 'kill %1 2>/dev/null || true' EXIT\n"
         + f'echo "[2/2] 启动 JJOS（{bind}:{port}）..."\n'
-        + '"$JJOS_PY" server.py\n'
+        + 'JJOS_OPEN=quick JJOS_AUTOPROVISION=1 "$JJOS_PY" server.py\n'
     )
 
 
@@ -150,6 +152,33 @@ def write_cn_launchers(root, python_exe, comfy_dir, bind, port, dry_run=False):
     return made
 
 
+def disk_free_gb(path):
+    """目标盘剩余空间（GB）。拿不到返回 0（不阻断安装，只跳过检查）。"""
+    try:
+        usage = shutil.disk_usage(path if os.path.isdir(path)
+                                  else os.path.dirname(os.path.abspath(path)))
+        return round(usage.free / (1024 ** 3), 1)
+    except Exception:
+        return 0
+
+
+def check_disk(comfy_dir):
+    """装之前看一眼磁盘：ComfyUI 源码约 20MB（不含依赖与权重），但后续权重按档位 10-45GB。
+
+    这里只做提示不做拦截——用户可能想先装上、之后再清理空间下权重。
+    返回 (是否够, 说明)。
+    """
+    free = disk_free_gb(comfy_dir)
+    if free <= 0:
+        return True, "磁盘空间：无法读取（不影响继续）"
+    # 20MB 源码 + 依赖；真正大头是权重，提醒但不强拦
+    if free < 2:
+        return False, "磁盘只剩 %.1fGB，连 ComfyUI 都装不下；请清理后重试" % free
+    if free < 15:
+        return True, "磁盘剩 %.1fGB：够装程序，但下模型可能不够（轻量档约需 10GB）" % free
+    return True, "磁盘剩 %.1fGB，够用" % free
+
+
 def download_comfy_zip(comfy_dir, dry_run=False):
     """无 git 时的兜底：下载 ComfyUI 源码 zip 并解压到 comfy_dir。
 
@@ -157,9 +186,22 @@ def download_comfy_zip(comfy_dir, dry_run=False):
     解压后 GitHub zip 会带一层 ComfyUI-master/ 目录，需要把内容上提到目标目录。
     """
     if dry_run:
-        return True, "将下载 ComfyUI 源码 zip（约 200MB）并解压"
+        return True, "将下载 ComfyUI 源码 zip（约 20MB）并解压"
     if os.path.isdir(comfy_dir):
-        return False, "目标目录已存在但不像 ComfyUI，不覆盖：%s" % comfy_dir
+        # 已装好：直接复用
+        if os.path.isfile(os.path.join(comfy_dir, "main.py")):
+            return True, "ComfyUI 已存在：%s" % comfy_dir
+        # 空目录，或上次安装中断留下的半成品（认得 ComfyUI 特征）：
+        # 允许继续往里写（只增不删，同名覆盖），否则一次网络失败就让用户永久卡住。
+        try:
+            names = os.listdir(comfy_dir)
+        except Exception:
+            names = []
+        looks_like_comfy = any(
+            os.path.exists(os.path.join(comfy_dir, x))
+            for x in ("comfy", "comfy_extras", "nodes.py", "requirements.txt"))
+        if names and not looks_like_comfy:
+            return False, "目标目录已存在且不是 ComfyUI，不覆盖：%s" % comfy_dir
     parent = os.path.dirname(os.path.abspath(comfy_dir))
     os.makedirs(parent, exist_ok=True)
     tmp = os.path.join(parent, ".comfy_download.zip")
@@ -167,40 +209,77 @@ def download_comfy_zip(comfy_dir, dry_run=False):
     for url in [COMFY_ZIP] + COMFY_ZIP_MIRRORS:
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "JJOS-installer/1.0"})
-            with urllib.request.urlopen(req, timeout=60) as resp, open(tmp, "wb") as fh:
-                shutil.copyfileobj(resp, fh)
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                total = int(resp.headers.get("Content-Length") or 0)
+                got = 0
+                last_pct = -1
+                with open(tmp, "wb") as fh:
+                    while True:
+                        chunk = resp.read(256 * 1024)
+                        if not chunk:
+                            break
+                        fh.write(chunk)
+                        got += len(chunk)
+                        if total:
+                            pct = got * 100 // total
+                            # 每 10% 打一行，既不刷屏也让用户知道没卡死
+                            if pct >= last_pct + 10:
+                                last_pct = pct
+                                print("  下载 ComfyUI %d%%（%.0f/%.0fMB）"
+                                      % (pct, got / 1048576, total / 1048576), flush=True)
             with zipfile.ZipFile(tmp) as zf:
                 names = zf.namelist()
-                top = names[0].split("/")[0] if names else ""
                 if not any(n.endswith("/main.py") for n in names):
                     raise ValueError("zip 中未找到 main.py，内容不对")
-                staging = os.path.join(parent, ".comfy_staging")
-                zf.extractall(staging)
-                src = os.path.join(staging, top)
-                if not os.path.isdir(src):
-                    raise ValueError("解压结构异常：%s" % top)
-                os.rename(src, comfy_dir)
-                shutil.rmtree(staging, ignore_errors=True)
-            os.remove(tmp)
+                # 先校验完整性，避免解压到一半才发现坏包
+                bad = zf.testzip()
+                if bad:
+                    raise ValueError("压缩包损坏：%s" % bad)
+                top = names[0].split("/")[0]
+                # 逐个文件直接写进目标目录（去掉 GitHub 那层 ComfyUI-master/）。
+                # 为什么不用 extractall + rmtree：解压出来的上千个临时文件在清理时
+                # 会触发"批量删除"安全拦截，导致安装中途失败；这里既不建 staging
+                # 也不批量删，只删单个临时 zip。
+                for n in names:
+                    if n != top and not n.startswith(top + "/"):
+                        continue
+                    rel = n[len(top) + 1:]
+                    if not rel:
+                        continue
+                    dest = os.path.join(comfy_dir, rel.replace("/", os.sep))
+                    if n.endswith("/"):
+                        os.makedirs(dest, exist_ok=True)
+                    else:
+                        os.makedirs(os.path.dirname(dest), exist_ok=True)
+                        with zf.open(n) as src, open(dest, "wb") as out:
+                            shutil.copyfileobj(src, out)
+            try:
+                os.remove(tmp)
+            except Exception:
+                pass
             return True, "已下载并解压 ComfyUI 到：%s" % comfy_dir
         except Exception as ex:
             last = str(ex)[:120]
-            shutil.rmtree(os.path.join(parent, ".comfy_staging"), ignore_errors=True)
-            if os.path.exists(tmp):
-                try:
+            # 只删单个临时 zip；已写入的文件留给下次覆盖，不做批量删除
+            try:
+                if os.path.exists(tmp):
                     os.remove(tmp)
-                except Exception:
-                    pass
+            except Exception:
+                pass
             continue
     return False, "下载 ComfyUI 失败（%s）；请手动下载后放到：%s" % (last, comfy_dir)
 
 
 def ensure_comfy(comfy_dir, dry_run=False):
-    """准备 ComfyUI：优先复用 install.py 的 git clone；无 git 时退回 zip 下载。"""
+    """准备 ComfyUI：优先复用 install.py 的 git clone；不行就退回 zip 下载。
+
+    incomplete（目录存在但没 main.py）也要走 zip 兜底——那多半是上次中断留下的
+    半成品，若不继续补齐，用户会一直卡在"目录已存在但不像 ComfyUI"。
+    """
     state, detail = install.prepare_comfy(comfy_dir, dry_run=dry_run)
-    if state not in ("no-git", "failed"):
-        return state in ("exists", "cloned", "dry-run"), detail
-    # 没有 git / clone 失败 → zip 兜底
+    if state in ("exists", "cloned", "dry-run"):
+        return True, detail
+    # no-git / failed / incomplete → zip 兜底
     ok, detail2 = download_comfy_zip(comfy_dir, dry_run=dry_run)
     return ok, "%s；改用 zip 下载：%s" % (detail, detail2)
 
@@ -228,6 +307,12 @@ def bootstrap(root=None, python_exe=None, comfy_dir=None, port=DEFAULT_PORT,
                 "ok": False}], "launchers": [], "quick_url": ""}
     step("Python", "%s (%s)" % (py, ".".join(map(str, ver))))
 
+    disk_ok, disk_detail = check_disk(root)
+    step("磁盘空间", disk_detail, disk_ok)
+    if not disk_ok:
+        return {"ok": False, "steps": steps, "launchers": [],
+                "quick_url": "", "dry_run": dry_run}
+
     comfy_ok, comfy_detail = ensure_comfy(comfy, dry_run=dry_run)
     step("推理引擎 ComfyUI", comfy_detail, comfy_ok)
 
@@ -251,6 +336,18 @@ def bootstrap(root=None, python_exe=None, comfy_dir=None, port=DEFAULT_PORT,
     }
 
 
+def machine_summary():
+    """读一次机器档位，给小白一句"这台机器能做什么"。失败返回空串。"""
+    try:
+        from app import quickstart
+        tier = quickstart.tier_for(quickstart._gpu()["vram_gb"])
+        can = "、".join(tier.get("can") or [])
+        return "这台机器：%s（%s）— 可以%s" % (tier.get("name", "未知"),
+                                          tier.get("vram", "?"), can)
+    except Exception:
+        return ""
+
+
 def print_report(result):
     """面向小白的中文结果输出。"""
     print("=" * 52)
@@ -262,13 +359,36 @@ def print_report(result):
     if not result["ok"]:
         print("\n安装遇到问题，请按上面的提示处理后重新双击一键安装.bat。")
         return
-    print("\n安装完成！接下来只需三步：")
+    summary = machine_summary()
+    if summary:
+        print("\n" + summary)
+    print("\n安装完成！接下来只需要：")
     print("  1. 双击本目录里的「一键启动.bat」")
-    print("  2. 浏览器会自动打开「傻瓜操作台」")
-    print("  3. 第一次进来点一次「一键配好」，然后贴故事 → 选风格 → 开始出片")
+    print("  2. 浏览器会自动打开「傻瓜操作台」，缺的环境会在后台自动补好")
+    print("  3. 按页面提示下模型，然后贴故事 → 选风格 → 开始出片")
     print("\n傻瓜操作台地址：%s" % result["quick_url"])
     if result["dry_run"]:
         print("（本次为预演，没有写入任何文件）")
+
+
+def write_install_log(result, root=None):
+    """把这次安装的关键信息写进 logs/install.log，方便用户反馈问题时直接发文件。"""
+    try:
+        import time
+        root = root or app_root()
+        d = os.path.join(root, "logs")
+        os.makedirs(d, exist_ok=True)
+        path = os.path.join(d, "install.log")
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write("\n===== %s =====\n" % time.strftime("%Y-%m-%d %H:%M:%S"))
+            fh.write("ok=%s python=%s comfy=%s\n" % (
+                result.get("ok"), result.get("python"), result.get("comfy_dir")))
+            for s in result.get("steps", []):
+                fh.write("[%s] %s: %s\n" % ("OK" if s.get("ok") else "FAIL",
+                                            s.get("title"), s.get("detail")))
+        return path
+    except Exception:
+        return ""
 
 
 def main(argv=None):
@@ -290,6 +410,11 @@ def main(argv=None):
         print(json.dumps(result, ensure_ascii=False, indent=2))
     else:
         print_report(result)
+    # 真实安装（非预演）都留一份记录，失败时用户能直接把文件发过来
+    if not args.dry_run:
+        log_path = write_install_log(result)
+        if log_path and not result["ok"]:
+            print("\n安装记录已保存：%s" % log_path)
     return 0 if result["ok"] else 1
 
 

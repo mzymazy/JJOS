@@ -140,5 +140,91 @@ class InstallerMetadataTests(unittest.TestCase):
         self.assertIn("https://ghproxy.net/", ps1)
 
 
+class DiskCheckTests(unittest.TestCase):
+    def test_low_disk_blocks(self):
+        import unittest.mock as mock
+        with mock.patch.object(B, "disk_free_gb", return_value=1.2):
+            ok, detail = B.check_disk("C:/")
+        self.assertFalse(ok)
+        self.assertIn("装不下", detail)
+
+    def test_medium_disk_warns_but_allows(self):
+        import unittest.mock as mock
+        with mock.patch.object(B, "disk_free_gb", return_value=10.0):
+            ok, detail = B.check_disk("C:/")
+        self.assertTrue(ok)
+        self.assertIn("下模型可能不够", detail)
+
+    def test_plenty_disk_ok(self):
+        import unittest.mock as mock
+        with mock.patch.object(B, "disk_free_gb", return_value=100.0):
+            ok, detail = B.check_disk("C:/")
+        self.assertTrue(ok)
+        self.assertIn("够用", detail)
+
+    def test_unknown_disk_does_not_block(self):
+        import unittest.mock as mock
+        with mock.patch.object(B, "disk_free_gb", return_value=0):
+            ok, _ = B.check_disk("C:/")
+        self.assertTrue(ok, "读不到磁盘不应阻断安装")
+
+
+class AutostartGateTests(unittest.TestCase):
+    def _fresh(self):
+        import importlib
+        import app.autostart as A
+        importlib.reload(A)
+        return A
+
+    def test_disabled_by_default(self):
+        A = self._fresh()
+        self.assertFalse(A.enabled())
+
+    def test_enabled_by_env(self):
+        A = self._fresh()
+        os.environ["JJOS_AUTOPROVISION"] = "1"
+        try:
+            self.assertTrue(A.enabled())
+        finally:
+            os.environ.pop("JJOS_AUTOPROVISION", None)
+
+    def test_needs_provision_ignores_weights(self):
+        """只有权重待下时不该自动触发（权重是用户级决策）。"""
+        A = self._fresh()
+        import unittest.mock as mock
+        report = {"runtime": {"cuda_ok": True}, "comfy": {"found": True},
+                  "config": {"exists": True}, "nodes": {"missing": []},
+                  "workflows": {"count": 1, "installed": 1},
+                  "machine": {"ffmpeg": True, "git": True},
+                  "weights": {"installed": []}, "comfy_offline": False}
+        plan = [{"id": "weights", "title": "出片模型", "detail": "", "kind": "auto", "need": True},
+                {"id": "comfy", "title": "推理引擎", "detail": "", "kind": "ok", "need": False}]
+        with mock.patch("app.quickstart.build_plan", return_value=plan):
+            need, why = A._needs_provision(report)
+        self.assertFalse(need)
+        self.assertIn("已就绪", why)
+
+    def test_needs_provision_when_env_missing(self):
+        A = self._fresh()
+        import unittest.mock as mock
+        plan = [{"id": "runtime", "title": "显卡运行环境", "detail": "", "kind": "auto", "need": True}]
+        with mock.patch("app.quickstart.build_plan", return_value=plan):
+            need, why = A._needs_provision({})
+        self.assertTrue(need)
+        self.assertIn("显卡运行环境", why)
+
+
+class LauncherEnvTests(unittest.TestCase):
+    def test_bat_sets_quick_open_and_autoprovision(self):
+        content = B.cn_bat_launcher("C:/py/python.exe", "D:/ComfyUI", "127.0.0.1", 8890)
+        self.assertIn('set "JJOS_OPEN=quick"', content)
+        self.assertIn('set "JJOS_AUTOPROVISION=1"', content)
+
+    def test_sh_sets_quick_open_and_autoprovision(self):
+        content = B.cn_sh_launcher("/opt/py", "/opt/ComfyUI", "127.0.0.1", 8890)
+        self.assertIn("JJOS_OPEN=quick", content)
+        self.assertIn("JJOS_AUTOPROVISION=1", content)
+
+
 if __name__ == "__main__":
     unittest.main()
