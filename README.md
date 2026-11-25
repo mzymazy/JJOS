@@ -21,6 +21,10 @@
 3. **双击 `一键启动.bat`** → 浏览器**直接打开傻瓜操作台** → 缺的环境会在后台自动补好 → 按提示下模型 → 贴故事、选风格、开始出片。
 
 > 想让安装/启动过程只做预演不落盘？设 `JJOS_DRY_RUN=1`；想关掉首启自动装配？设 `JJOS_AUTOPROVISION=0`。
+>
+> **想自己复验"没装 Python 的机器能不能装"？** 在仓库根目录跑
+> `powershell -ExecutionPolicy Bypass -File tests\cold_start_smoke.ps1`
+> （会把 PATH 缩到只剩系统目录来模拟裸机，首次需联网约 50MB；加 `-UseCache` 复用已下载的 Python）。
 
 - 想先看会做什么、不写入任何文件？设环境变量 `JJOS_DRY_RUN=1` 再双击即为预演；或命令行跑 `python bootstrap.py --dry-run`。
 - 下载源不通时可用 `JJOS_PY_MIRROR` 指定镜像前缀；内置 Python 版本可用 `JJOS_PY_BUNDLE_VER` / `JJOS_PY_VERSION` / `JJOS_PY_SHA256` / `JJOS_PY_SIZE` 覆盖（升级内置版本时改这四项即可，无需改逻辑）。
